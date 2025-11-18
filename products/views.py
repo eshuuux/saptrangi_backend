@@ -42,7 +42,7 @@ def product(request):
             category=body.get('category'),
             top_picks=body.get('top_picks'),
             )
-            return JsonResponse({"message":"product added"},status=201)
+            return JsonResponse({"message":"product added", "id":p.id},status=201)
         except Exception as e:
             return JsonResponse({"error": str(e)},status=400)
     else:
@@ -51,3 +51,23 @@ def product(request):
 def get_product(request):
     data=list(Product.objects.values())
     return JsonResponse(data, safe=False)
+
+@csrf_exempt
+def banner(request):
+    if request.method=="POST":
+        try:
+            body=json.loads(request.body)
+            b=Banner.objects.create(
+                name=body.get('name'),
+                banner_image=body.get('banner_img'),
+            )
+            return JsonResponse({"message":"Added", "id":b.id})
+        except Exception as e :
+            return JsonResponse({"error": str(e)},status=400)
+    else:
+        return JsonResponse({"error":"use post method"},status=400)
+
+def get_banner(request):
+    data=list(Banner.objects.values())
+    return JsonResponse(data, safe=False)
+            

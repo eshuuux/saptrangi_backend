@@ -7,5 +7,6 @@ urlpatterns = [
     path('carousel_data',views.get_carousel),
     path('product',views.product),
     path('product_data',views.get_product),
-
+    path('banner',views.banner),
+    path('banner_data',views.get_banner),
 ]
