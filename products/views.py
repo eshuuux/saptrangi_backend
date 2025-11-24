@@ -9,15 +9,13 @@ from .serializers import CarouselSerializer, BannerSerializer, ProductSerializer
 
 @method_decorator(csrf_exempt, name='dispatch')
 class CarouselView(APIView):
-
     def post(self, request):
-        body = request.data
-        c = Carousel.objects.create(
-            name=body.get('name'),
-            desktop_image=body.get('desktop_img'),
-            mobile_image=body.get('mobile_img')
-        )
-        return Response({"message": "Added!", "id": c.id})
+        serializer = CarouselSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "created", "data": serializer.data}, status=201)
+        return Response(serializer.errors, status=400)
+
 
     def get(self, request):
         carousels = Carousel.objects.all()
