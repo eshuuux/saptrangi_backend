@@ -60,6 +60,6 @@ class BannerView(APIView):
         return Response({"message": "banner added", "id":b.id })
     
     def get(self, request):
-        data = Banner.objects.all()
-        serializer = BannerSerializer(data, many=True)
+        banners = Banner.objects.all()
+        serializer = BannerSerializer(banners, many=True)
         return Response({"banners": serializer.data})
