@@ -16,7 +16,6 @@ class CarouselView(APIView):
             return Response({"message": "created", "data": serializer.data}, status=201)
         return Response(serializer.errors, status=400)
 
-
     def get(self, request):
         carousels = Carousel.objects.all()
         serializer = CarouselSerializer(carousels, many=True)
@@ -27,19 +26,12 @@ class CarouselView(APIView):
 class ProductView(APIView):
     
     def post(self, request):
-        body=request.data
-        p=Product.objects.create(
-            name=body.get('name'),
-            mrp=body.get('mrp'),
-            price=body.get('price'),
-            rating=body.get('rating'),
-            discount=body.get('discount'),
-            product_images=body.get('images'),
-            category=body.get('category'),
-            top_picks=body.get('top_picks')
-        )
-        return Response({"message": "product added !"})
-    
+       serializer = ProductSerializer(data=request.data)
+       if serializer.is_valid():
+           serializer.save()
+           return Response({"message":"created", "data":serializer.data}, status=201)
+       return Response(serializer.error, status=400)
+           
     def get(self, request):
         products=Product.objects.all()
         serializer = ProductSerializer(products, many=True)
@@ -49,12 +41,11 @@ class ProductView(APIView):
 class BannerView(APIView):
 
     def post(self, request):
-        body=request.data
-        b=Banner.objects.create(
-            name=body.get('name'),
-            banner_image=body.get('banner_image'),
-        )
-        return Response({"message": "banner added", "id":b.id })
+        serializer = BannerSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message":"created", "data":serializer.data}, status=201)
+        return Response(serializer.error, status=400)
     
     def get(self, request):
         banners = Banner.objects.all()
