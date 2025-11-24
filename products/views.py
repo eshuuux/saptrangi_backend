@@ -18,13 +18,11 @@ class CarouselView(APIView):
             mobile_image=body.get('mobile_img')
         )
         return Response({"message": "Added!", "id": c.id})
-    
-    from .serializers import CarouselSerializer, BannerSerializer
 
-def get(self, request):
-    carousels = Carousel.objects.all()
-    serializer = CarouselSerializer(carousels, many=True)
-    return Response({"carousels": serializer.data})
+    def get(self, request):
+        carousels = Carousel.objects.all()
+        serializer = CarouselSerializer(carousels, many=True)
+        return Response({"carousels": serializer.data})
 
 
 @method_decorator(csrf_exempt, name='dispatch')
