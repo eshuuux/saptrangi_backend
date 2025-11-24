@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 from pathlib import Path
+import dj_database_url
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,9 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-iu9z71i!mmqo=_-55yqo!x+xgxl&!(@zcj1#5xh-ecbjtc9&hf'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -50,6 +52,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = 'saptrangi_backend.urls'
@@ -69,21 +72,21 @@ TEMPLATES = [
     },
 ]
 
+
+
+
 WSGI_APPLICATION = 'saptrangi_backend.wsgi.application'
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'saptrangi',        # your database name
-        'USER': 'postgres',    # your postgres username
-        'PASSWORD': 'Ashishak@470',
-        'HOST': 'localhost',
-        'PORT': '8659',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get("postgresql://ashish:k0vJbZcMjphSS9140WT38mH9jvdeXlNV@dpg-d4i6f195pdvs739knlbg-a.oregon-postgres.render.com/saptrangi"),
+        conn_max_age=600
+    )
 }
 
 
@@ -121,7 +124,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

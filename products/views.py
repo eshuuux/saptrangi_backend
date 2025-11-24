@@ -1,73 +1,59 @@
-import json
-from django.shortcuts import render
-from django.http import JsonResponse
-from .models import Carousel, Product, Banner
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Carousel,Product,Banner
 from django.views.decorators.csrf import csrf_exempt
-from django.shortcuts import render, HttpResponse , redirect
+from django.utils.decorators import method_decorator
 
-# Create your views here.
 
-@csrf_exempt
-def carousel(request):
-    if request.method=="POST":
-        try:
-            body=json.loads(request.body)
-            c=Carousel.objects.create(
-                name=body.get('name'),
-                desktop_image=body.get('desktop_img'),
-                mobile_image=body.get('mobile_img')
-            )
-            return JsonResponse({"message":"Added !", "id":c.id})
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
-    return JsonResponse({"error":"use post method"}, status=400)
+@method_decorator(csrf_exempt, name='dispatch')
+class CarouselView(APIView):
 
-def get_carousel(request):
-    data=list(Carousel.objects.values())
-    return JsonResponse(data, safe=False)
+    def post(self, request):
+        body = request.data
+        c = Carousel.objects.create(
+            name=body.get('name'),
+            desktop_image=body.get('desktop_img'),
+            mobile_image=body.get('mobile_img')
+        )
+        return Response({"message": "Added!", "id": c.id})
+    
+    def get(self, request):
+        data = Carousel.objects.all().values()
+        return Response({"carousels": list(data)})
 
-@csrf_exempt
-def product(request):
-    if request.method=="POST":
-        try:
-            body=json.loads(request.body)
-            images = body.get('product_images',[])
-            p=Product.objects.create(
+@method_decorator(csrf_exempt, name='dispatch')
+class ProductView(APIView):
+    
+    def post(self, request):
+        body=request.data
+        p=Product.objects.create(
             name=body.get('name'),
             mrp=body.get('mrp'),
             price=body.get('price'),
             rating=body.get('rating'),
             discount=body.get('discount'),
-            product_images=images,
+            product_images=body.get('images'),
             category=body.get('category'),
-            top_picks=body.get('top_picks'),
-            )
-            return JsonResponse({"message":"product added", "id":p.id},status=201)
-        except Exception as e:
-            return JsonResponse({"error": str(e)},status=400)
-    else:
-        return JsonResponse({"error":"use post method"}, status=400)
+            top_picks=body.get('top_picks')
+        )
+        return Response({"message": "product added !"})
+    
+    def get(self, request):
+        data=Product.objects.all().values()
+        return Response({"products": list(data)})
+    
+@method_decorator(csrf_exempt, name='dispatch')
+class BannerView(APIView):
 
-def get_product(request):
-    data=list(Product.objects.values())
-    return JsonResponse(data, safe=False)
-
-@csrf_exempt
-def banner(request):
-    if request.method=="POST":
-        try:
-            body=json.loads(request.body)
-            b=Banner.objects.create(
-                name=body.get('name'),
-                banner_image=body.get('banner_img'),
-            )
-            return JsonResponse({"message":"Added", "id":b.id})
-        except Exception as e :
-            return JsonResponse({"error": str(e)},status=400)
-    else:
-        return JsonResponse({"error":"use post method"},status=400)
-
-def get_banner(request):
-    data=list(Banner.objects.values())
-    return JsonResponse(data, safe=False)
-            
+    def post(self, request):
+        body=request.data
+        b=Banner.objects.create(
+            name=body.get('name'),
+            banner_image=body.get('banner_image'),
+        )
+        return Response({"message": "banner added", "id":b.id })
+    
+    def get(self, request):
+        data=Banner.objects.all().values()
+        return Response({"banners": list(data)})

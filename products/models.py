@@ -13,12 +13,13 @@ class Carousel(models.Model):
 class Product(models.Model):
     name=models.CharField(max_length=100)
     mrp=models.IntegerField()     # Maximum Retail Price
-    price=models.IntegerField()
+    price=models.IntegerField()        #SLUGGINATION, INSTAED OF SPACE ADD - , ALSO ALL LOWERCASE () ANOTHER COLUMN.
     rating=models.FloatField()
     discount=models.IntegerField()
     product_images=ArrayField(models.URLField(max_length=500), blank=True, default=list)
     category=models.CharField(max_length=100)
     top_picks=models.BooleanField(default=False)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta():
         db_table='product'

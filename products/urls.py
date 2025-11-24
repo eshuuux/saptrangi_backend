@@ -1,12 +1,13 @@
 from .import views
 from django.urls import path
 from django.contrib import admin
+from .views import *
 
 urlpatterns = [
-    path('carousel',views.carousel),
-    path('carousel_data',views.get_carousel),
-    path('product',views.product),
-    path('product_data',views.get_product),
-    path('banner',views.banner),
-    path('banner_data',views.get_banner),
+    # path('banner',views.banner),
+    # path('banner_data',views.get_banner),
+    path('carousel/',CarouselView.as_view()),
+    path('product/',ProductView.as_view()),
+    path('banner/',BannerView.as_view()),
+    
 ]
