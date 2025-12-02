@@ -9,6 +9,7 @@ from .serializers import CarouselSerializer, BannerSerializer, ProductSerializer
 
 @method_decorator(csrf_exempt, name='dispatch')
 class CarouselView(APIView):
+
     def post(self, request):
         serializer = CarouselSerializer(data=request.data)
         if serializer.is_valid():
@@ -24,7 +25,7 @@ class CarouselView(APIView):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ProductView(APIView):
-    
+
     def post(self, request):
        serializer = ProductSerializer(data=request.data)
        if serializer.is_valid():

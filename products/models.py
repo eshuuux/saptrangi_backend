@@ -29,3 +29,8 @@ class Banner(models.Model):
     banner_image=models.URLField(max_length=500)    # Banner Image
     class Meta():
         db_table='banner'
+
+class Slug(models.Model):
+    slug=models.CharField(max_length=100)
+    class Meta():
+        db_table='slug'
