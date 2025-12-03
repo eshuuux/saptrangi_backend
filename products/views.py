@@ -58,9 +58,9 @@ class OverallView(APIView):
         carousel = Carousel.objects.all()
         product = Product.objects.all()
         banner = Banner.objects.all()
-        
+
         car_serializer = CarouselSerializer(carousel, many=True)
         pro_serializer = ProductSerializer(product, many=True)
         ban_serializer = BannerSerializer(banner, many=True)
 
-        return Response({"carousel":car_serializer.data,"product":pro_serializer.data,"banner":ban_serializer.data},status=200)        
+        return Response({"carousel":car_serializer.data,"product":pro_serializer.data,"banner":ban_serializer.data},status=200)

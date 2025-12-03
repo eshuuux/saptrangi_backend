@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.text import slugify
 from django.contrib.postgres.fields import ArrayField
 
 # Create your models here.
@@ -18,19 +19,26 @@ class Product(models.Model):
     discount=models.IntegerField()
     product_images=ArrayField(models.URLField(max_length=500), blank=True, default=list)
     category=models.CharField(max_length=100)
+    slug=models.CharField(max_length=100)
     top_picks=models.BooleanField(default=False)
-    
+    slug = models.CharField(max_length=150, unique=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta():
         db_table='product'
-    
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.name)
+            slug = base_slug
+            count = 1
+            while Product.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{count}"
+                count += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+
 class Banner(models.Model):
     name=models.CharField(max_length=100)
     banner_image=models.URLField(max_length=500)    # Banner Image
     class Meta():
         db_table='banner'
-
-class Slug(models.Model):
-    slug=models.CharField(max_length=100)
-    class Meta():
-        db_table='slug'
