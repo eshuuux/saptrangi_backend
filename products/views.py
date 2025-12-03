@@ -6,7 +6,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .serializers import CarouselSerializer, BannerSerializer, ProductSerializer
 
-
 @method_decorator(csrf_exempt, name='dispatch')
 class CarouselView(APIView):
 
@@ -21,7 +20,6 @@ class CarouselView(APIView):
         carousels = Carousel.objects.all()
         serializer = CarouselSerializer(carousels, many=True)
         return Response({"carousels": serializer.data})
-
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ProductView(APIView):
@@ -52,3 +50,17 @@ class BannerView(APIView):
         banners = Banner.objects.all()
         serializer = BannerSerializer(banners, many=True)
         return Response({"banners": serializer.data})
+    
+@method_decorator(csrf_exempt, name='dispatch')
+class OverallView(APIView):
+
+    def get(self,request):
+        carousel = Carousel.objects.all()
+        product = Product.objects.all()
+        banner = Banner.objects.all()
+
+        car_serializer = CarouselSerializer(carousel, many=True)
+        pro_serializer = ProductSerializer(product, many=True)
+        ban_serializer = BannerSerializer(banner, many=True)
+
+        return Response({"carousel":car_serializer.data,"product":pro_serializer.data,"banner":ban_serializer.data},status=200)        
