@@ -10,9 +10,11 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 from pathlib import Path
-import dj_database_url
 import os
+import dj_database_url
+from dotenv import load_dotenv
 
+load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,13 +23,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY")
+SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-key")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = False
 
 ALLOWED_HOSTS = ['*']
-DEBUG = os.environ.get("DEBUG") == "True"
+DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 # Application definition
 
@@ -94,11 +96,11 @@ WSGI_APPLICATION = 'saptrangi_backend.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get("postgresql://ashish:k0vJbZcMjphSS9140WT38mH9jvdeXlNV@dpg-d4i6f195pdvs739knlbg-a.oregon-postgres.render.com/saptrangi"),
+        env="DATABASE_URL",
+        default="postgresql://ashish:k0vJbZcMjphSS9140WT38mH9jvdeXlNV@dpg-d4i6f195pdvs739knlbg-a.oregon-postgres.render.com/saptrangi",
         conn_max_age=600
     )
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
