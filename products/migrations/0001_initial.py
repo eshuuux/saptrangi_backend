@@ -6,9 +6,8 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
 
-    initial = True
-
     dependencies = [
+        ('products', '0000_cleanup_render_tables'),
     ]
 
     operations = [
