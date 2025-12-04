@@ -19,10 +19,17 @@ class Product(models.Model):
     discount=models.IntegerField()
     product_images=ArrayField(models.URLField(max_length=500), blank=True, default=list)
     category=models.CharField(max_length=100)
-    slug=models.CharField(max_length=100)
-    top_picks=models.BooleanField(default=False)
+    fabric = models.CharField(max_length=100)
+    size = models.CharField(max_length=100)
     slug = models.CharField(max_length=150, unique=True, blank=True)
+    quantity = models.IntegerField()
+    comfort = models.CharField(max_length=100)
+    occasion = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    top_picks=models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+
     class Meta():
         db_table='product'
 
