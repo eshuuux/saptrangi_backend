@@ -7,7 +7,6 @@ urlpatterns = [
     path('carousel/',CarouselView.as_view()),
     path('product/',ProductView.as_view()),
     path('banner/',BannerView.as_view()),
-    path('overall/',OverallView.as_view()),
-
+    path('home/',HomeView.as_view()),
+    path('product/<slug:slug>/',ProductDetailBySlug.as_view())
 ]
-

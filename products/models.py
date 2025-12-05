@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.utils.text import slugify
 from django.contrib.postgres.fields import ArrayField
@@ -36,16 +37,13 @@ class Product(models.Model):
     def save(self, *args, **kwargs):
         if not self.slug:
             base_slug = slugify(self.name)
-            slug = base_slug
-            count = 1
-            while Product.objects.filter(slug=slug).exists():
-                slug = f"{base_slug}-{count}"
-                count += 1
-            self.slug = slug
+            unique_id = uuid.uuid4().hex[:6]  # 6-digit professional hash
+            self.slug = f"{base_slug}-{unique_id}"  # example: classic-white-tee-a3b4c1
         super().save(*args, **kwargs)
 
 class Banner(models.Model):
     name=models.CharField(max_length=100)
+    category=models.CharField(max_length=100, blank=True)
     banner_image=models.URLField(max_length=500)    # Banner Image
     class Meta():
         db_table='banner'

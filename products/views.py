@@ -52,15 +52,38 @@ class BannerView(APIView):
         return Response({"banners": serializer.data})
     
 @method_decorator(csrf_exempt, name='dispatch')
-class OverallView(APIView):
+class HomeView(APIView):
 
     def get(self,request):
-        carousel = Carousel.objects.all()
-        product = Product.objects.all()
-        banner = Banner.objects.all()
+        carousel = Carousel.objects.all().order_by('-id')[:2].values(
+            "desktop_image","mobile_image"
+        )
+        top_picks = Product.objects.filter(top_picks=True).order_by('-id').values(
+            "name","price","mrp","discount","rating","product_images"
+        )
+        banners = Banner.objects.all().order_by('-id').values(
+            "name","category","banner_image"
+        )
 
-        car_serializer = CarouselSerializer(carousel, many=True)
-        pro_serializer = ProductSerializer(product, many=True)
-        ban_serializer = BannerSerializer(banner, many=True)
-
-        return Response({"carousel":car_serializer.data,"product":pro_serializer.data,"banner":ban_serializer.data},status=200)
+        products_by_banner={}
+        for banner in banners:
+            category = banner["category"]
+            products = Product.objects.filter(category=category).order_by('-id')[:10].values(
+                "name","price","mrp","discount","rating","product_images"
+            )
+            products_by_banner[category]=list(products)
+        return Response({
+            "carousel":list(carousel),
+            "top_picks":list(top_picks),
+            "banners":list(banners),
+            "product_by_banner":products_by_banner
+        },status=200)
+    
+class ProductDetailBySlug(APIView):
+    def get(self, request, slug):
+        try:
+            product = Product.objects.get(slug=slug)
+            serializer = ProductSerializer(product)
+            return Response(serializer.data)
+        except Product.DoesNotExist:
+            return Response({"error": "Product not found"}, status=404)
