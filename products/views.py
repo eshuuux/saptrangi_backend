@@ -79,6 +79,7 @@ class HomeView(APIView):
             "product_by_banner":products_by_banner
         },status=200)
     
+@method_decorator(csrf_exempt, name='dispatch')
 class ProductDetailBySlug(APIView):
     def get(self, request, slug):
         try:
@@ -87,3 +88,14 @@ class ProductDetailBySlug(APIView):
             return Response(serializer.data)
         except Product.DoesNotExist:
             return Response({"error": "Product not found"}, status=404)
+        
+@method_decorator(csrf_exempt, name='dispatch')
+class ProductDetailByCategory(APIView):
+    def get(self, request, category):
+        products = Product.objects.filter(category=category)
+
+        if products.exists():
+            serializer = ProductSerializer(products, many=True) 
+            return Response(serializer.data)
+
+        return Response({"error": "No products found"}, status=404)
