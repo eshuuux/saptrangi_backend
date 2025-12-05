@@ -59,7 +59,7 @@ class HomeView(APIView):
             "desktop_image","mobile_image"
         )
         top_picks = Product.objects.filter(top_picks=True).order_by('-id').values(
-            "name","price","mrp","discount","rating","product_images"
+            "name","price","mrp","discount","rating","product_images","slug"
         )
         banners = Banner.objects.all().order_by('-id').values(
             "name","category","banner_image"
@@ -69,7 +69,7 @@ class HomeView(APIView):
         for banner in banners:
             category = banner["category"]
             products = Product.objects.filter(category=category).order_by('-id')[:10].values(
-                "name","price","mrp","discount","rating","product_images"
+                "name","price","mrp","discount","rating","product_images","slug"
             )
             products_by_banner[category]=list(products)
         return Response({
