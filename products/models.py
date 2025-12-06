@@ -2,6 +2,7 @@ import uuid
 from django.db import models
 from django.utils.text import slugify
 from django.contrib.postgres.fields import ArrayField
+from django.core.validators import FileExtensionValidator
 
 # Create your models here.
 
@@ -14,11 +15,12 @@ class Carousel(models.Model):
 
 class Product(models.Model):
     name=models.CharField(max_length=100)
-    mrp=models.IntegerField()     # Maximum Retail Price
-    price=models.IntegerField()        #SLUGGINATION, INSTAED OF SPACE ADD - , ALSO ALL LOWERCASE () ANOTHER COLUMN.
+    mrp=models.IntegerField()     
+    price=models.IntegerField()      
     rating=models.FloatField()
     discount=models.IntegerField()
-    product_images=ArrayField(models.URLField(max_length=500), blank=True, default=list)
+    main_image = models.URLField(blank=True)
+    hover_image = models.URLField(blank=True)
     category=models.CharField(max_length=100)
     fabric = models.CharField(max_length=100, blank=True)
     size = models.CharField(max_length=100, blank=True)
@@ -27,10 +29,9 @@ class Product(models.Model):
     comfort = models.CharField(max_length=100, blank=True)
     occasion = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True, null=True)
-    top_picks=models.BooleanField(default=False)
+    top_picks =  models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     
-
     class Meta():
         db_table='product'
 

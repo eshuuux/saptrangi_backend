@@ -1,16 +1,31 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
+import cloudinary.uploader
 from rest_framework import status
 from .models import Carousel,Product,Banner
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from rest_framework.parsers import MultiPartParser, FormParser
 from .serializers import CarouselSerializer, BannerSerializer, ProductSerializer
 
 @method_decorator(csrf_exempt, name='dispatch')
 class CarouselView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
-        serializer = CarouselSerializer(data=request.data)
+        data = request.data.copy()
+        desktop_img = request.FILES.get('desktop_image')
+        mobile_img = request.FILES.get('mobile_image')
+
+        if desktop_img:
+            upload_d = cloudinary.uploader.upload(desktop_img, folder="carousel/desktop/")
+            data['desktop_image'] = upload_d['secure_url']
+
+        if mobile_img:
+            upload_m = cloudinary.uploader.upload(mobile_img, folder="carousel/mobile/")
+            data['mobile_image'] = upload_m['secure_url']
+
+        serializer = CarouselSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response({"message": "created", "data": serializer.data}, status=201)
@@ -23,13 +38,26 @@ class CarouselView(APIView):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ProductView(APIView):
-
+    parser_classes = [MultiPartParser, FormParser]
     def post(self, request):
-       serializer = ProductSerializer(data=request.data)
-       if serializer.is_valid():
+        data = request.data.copy()
+        main_img = request.FILES.get("main_image")
+        hover_img = request.FILES.get("hover_image")
+
+        # Upload main image
+        if main_img:
+            upload1 = cloudinary.uploader.upload(main_img, folder="products/main/")
+            data["main_image"] = upload1["secure_url"]
+
+        # Upload hover image
+        if hover_img:
+            upload2 = cloudinary.uploader.upload(hover_img, folder="products/hover/")
+            data["hover_image"] = upload2["secure_url"]
+        serializer = ProductSerializer(data=data)
+        if serializer.is_valid():
            serializer.save()
            return Response({"message":"created", "data":serializer.data}, status=201)
-       return Response(serializer.error, status=400)
+        return Response(serializer.errors, status=400)
            
     def get(self, request):
         products=Product.objects.all()
@@ -38,13 +66,25 @@ class ProductView(APIView):
     
 @method_decorator(csrf_exempt, name='dispatch')
 class BannerView(APIView):
-
+    parser_classes = [MultiPartParser, FormParser]
     def post(self, request):
-        serializer = BannerSerializer(data=request.data)
+        data = request.data.copy()
+        image = request.FILES.get('banner_image')
+
+        if image:
+            upload= cloudinary.uploader.upload(
+                image,
+                folder="banners/",
+                use_filename=True,
+                unique_filename=False
+            )
+            data['banner_image'] = upload['secure_url']
+
+        serializer = BannerSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response({"message":"created", "data":serializer.data}, status=201)
-        return Response(serializer.error, status=400)
+        return Response(serializer.errors, status=400)
     
     def get(self, request):
         banners = Banner.objects.all()

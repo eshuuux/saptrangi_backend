@@ -13,6 +13,9 @@ from pathlib import Path
 import os
 import dj_database_url
 from dotenv import load_dotenv
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -46,6 +49,8 @@ INSTALLED_APPS = [
     'products',
     'orders',
     'payments',
+     'cloudinary',
+    'cloudinary_storage',
     
 ]
 
@@ -57,7 +62,15 @@ REST_FRAMEWORK = {
 }
 
 
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticHashedCloudinaryStorage'
 
+cloudinary.config( 
+    cloud_name = "dcskqhiwb",
+    api_key = "688844436758916",
+    api_secret = "hdfkwHRw70SkOGP3Zlb4VkRQQzA",
+    secure = True
+)
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
