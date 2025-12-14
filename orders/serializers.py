@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import Cart, Order, OrderItem
 from products.serializers import ProductSerializer
-
+from users.serializers import AddressSerializer
 
 # ============================ CART SERIALIZER ============================ #
 class CartSerializer(serializers.ModelSerializer):
@@ -27,10 +27,12 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     total_items = serializers.SerializerMethodField()   # 🔥 new dynamic field
+    address = AddressSerializer(read_only=True)   # NEW
+
 
     class Meta:
         model = Order
-        fields = ["id", "total_amount", "total_items", "status", "created_at", "items"]
+        fields = ["id", "total_amount", "total_items", "status", "created_at", "address", "items"]
 
     def get_total_items(self, obj):
         return obj.items.count()  # count number of products in order

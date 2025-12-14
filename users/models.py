@@ -14,6 +14,7 @@ class User(models.Model):
     email      = models.EmailField(blank=True, null=True, unique=True)
     mobile     = models.CharField(max_length=10, unique=True)   # 🔥 must be unique
     gender     = models.CharField(max_length=10, blank=True, null=True)
+    
 
     # 🔹 Optional details
     dob         = models.DateField(blank=True, null=True)       # better than CharField

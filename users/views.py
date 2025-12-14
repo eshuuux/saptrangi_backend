@@ -6,9 +6,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.utils import timezone
+from .utils import send_otp_msg91
 from .models import User, OTP, Address
 from .serializers import UserSerializer, AddressSerializer
-
 
 
 # =============================================================
@@ -49,30 +49,32 @@ class UpdateProfile(APIView):
 # =============================================================
 # SEND OTP FOR LOGIN / REGISTER
 # =============================================================
+
 class SendOTPView(APIView):
     def post(self, request):
         mobile = request.data.get("mobile")
 
-        if not mobile:
-            return Response({"error": "Mobile is required"}, status=400)
+        if not mobile or len(mobile) != 10 or not mobile.isdigit():
+            return Response({"error": "Invalid mobile number"}, status=400)
 
-        if len(mobile) != 10 or not mobile.isdigit():
-            return Response({"error": "Enter valid 10 digit mobile number"}, status=400)
+        # Invalidate old OTPs
+        OTP.objects.filter(mobile=mobile, is_used=False).update(is_used=True)
 
-        # Generate six digit OTP 🔥
-        code = str(random.randint(100000, 999999))
+        otp = str(random.randint(100000, 999999))
 
-        OTP.objects.create(mobile=mobile, code=code)
+        OTP.objects.create(
+            mobile=mobile,
+            code=otp
+        )
 
-        # TODO → Integrate MSG91 here
-        print("OTP for Testing:", code)   # remove once MSG91 integrated
+        sent = send_otp_msg91(mobile, otp)
+
+        if not sent:
+            return Response({"error": "Failed to send OTP"}, status=500)
 
         return Response({
-            "message": "OTP sent successfully",
-            "mobile": mobile,
-            "otp_demo": code   # remove later in production
+            "message": "OTP sent successfully"
         }, status=200)
-
 
 
 # =============================================================
