@@ -116,59 +116,84 @@ class VerifyOTPView(APIView):
         mobile = request.data.get("mobile")
         code = request.data.get("otp")
 
+        # -----------------------------
+        # Basic validation
+        # -----------------------------
         if not mobile or not code:
             return Response(
-                {"error": "Mobile + OTP required"},
-                status=400
+                {"error": "Mobile and OTP are required"},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        try:
-            otp_obj = OTP.objects.filter(
-                mobile=mobile,
-                code=code,
-                is_used=False
-            ).latest("created_at")
-        except OTP.DoesNotExist:
+        # -----------------------------
+        # Fetch latest unused OTP
+        # -----------------------------
+        otp_obj = OTP.objects.filter(
+            mobile=mobile,
+            code=code,
+            is_used=False
+        ).first()
+
+        if not otp_obj:
             return Response(
                 {"error": "Invalid OTP"},
-                status=400
+                status=status.HTTP_400_BAD_REQUEST
             )
 
+        # -----------------------------
+        # Expiry check
+        # -----------------------------
         if otp_obj.is_expired():
             return Response(
                 {"error": "OTP Expired"},
-                status=400
+                status=status.HTTP_400_BAD_REQUEST
             )
 
+        # -----------------------------
+        # Mark OTP as used
+        # -----------------------------
         otp_obj.is_used = True
-        otp_obj.save()
+        otp_obj.save(update_fields=["is_used"])
 
+        # -----------------------------
+        # Create / Fetch user
+        # -----------------------------
         user, created = User.objects.get_or_create(mobile=mobile)
 
-        refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
+        try:
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+        except TokenError:
+            return Response(
+                {"error": "Token generation failed"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
+        # -----------------------------
+        # Response
+        # -----------------------------
         response = Response(
             {
-                "message": "Registered + Logged in" if created else "Logged in Successfully",
+                "message": "Registration + Login successful" if created else "Login successful",
                 "user": UserSerializer(user).data,
                 "accessToken": access_token,
             },
-            status=200,
+            status=status.HTTP_200_OK
         )
 
-        # 🔐 ENV-SAFE REFRESH TOKEN COOKIE
+        # -----------------------------
+        # Secure Refresh Token Cookie
+        # -----------------------------
         response.set_cookie(
             key="refresh_token",
             value=str(refresh),
             httponly=True,
-            secure=not settings.DEBUG,                   # False on localhost, True on Render
+            secure=not settings.DEBUG,  # False locally, True on Render
             samesite="None" if not settings.DEBUG else "Lax",
-            max_age=7 * 24 * 60 * 60,                   # 7 days
+            max_age=7 * 24 * 60 * 60,   # 7 days
         )
 
         return response
-
 
 # =============================================================
 # REFRESH TOKEN → NEW ACCESS TOKEN
