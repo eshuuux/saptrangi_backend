@@ -21,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-key")
 
-DEBUG = os.environ.get("DEBUG", "False") == "True"
+DEBUG = os.environ.get("DEBUG", "True") == "True"
 
 ALLOWED_HOSTS = ["*"]
 
@@ -30,24 +30,24 @@ ALLOWED_HOSTS = ["*"]
 # --------------------------------------------------
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
 
     # Third-party
-    'corsheaders',
-    'rest_framework',
-    'cloudinary',
-    'cloudinary_storage',
+    "corsheaders",
+    "rest_framework",
+    "cloudinary",
+    "cloudinary_storage",
 
     # Local apps
-    'users',
-    'products',
-    'orders',
-    'payments',
+    "users",
+    "products",
+    "orders",
+    "payments",
 ]
 
 # --------------------------------------------------
@@ -55,19 +55,19 @@ INSTALLED_APPS = [
 # --------------------------------------------------
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
 ]
 
 # --------------------------------------------------
-# CORS + CSRF (🔥 MAIN FIX 🔥)
+# CORS + CSRF (ENV SAFE)
 # --------------------------------------------------
 
 CORS_ALLOW_CREDENTIALS = True
@@ -82,25 +82,26 @@ CSRF_TRUSTED_ORIGINS = [
     "https://saptrangi.netlify.app",
 ]
 
-CSRF_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SECURE = True
+# 🔐 ENV-BASED COOKIE SETTINGS
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
 
-SESSION_COOKIE_SAMESITE = "None"
-SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
+SESSION_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
 
 # --------------------------------------------------
 # DJANGO REST FRAMEWORK
 # --------------------------------------------------
 
 REST_FRAMEWORK = {
-    'DEFAULT_RENDERER_CLASSES': (
-        'rest_framework.renderers.JSONRenderer',
+    "DEFAULT_RENDERER_CLASSES": (
+        "rest_framework.renderers.JSONRenderer",
     ),
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.AllowAny',
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.AllowAny",
     ),
 }
 
@@ -109,9 +110,9 @@ REST_FRAMEWORK = {
 # --------------------------------------------------
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'AUTH_HEADER_TYPES': ('Bearer',),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
 # --------------------------------------------------
@@ -119,53 +120,53 @@ SIMPLE_JWT = {
 # --------------------------------------------------
 
 DATABASES = {
-    'default': dj_database_url.config(
+    "default": dj_database_url.config(
         env="DATABASE_URL",
         default="postgresql://ashish:k0vJbZcMjphSS9140WT38mH9jvdeXlNV@dpg-d4i6f195pdvs739knlbg-a.oregon-postgres.render.com/saptrangi",
-        conn_max_age=600
+        conn_max_age=600,
     )
 }
 
 # --------------------------------------------------
-# TEMPLATES
+# URLS & TEMPLATES
 # --------------------------------------------------
 
-ROOT_URLCONF = 'saptrangi_backend.urls'
+ROOT_URLCONF = "saptrangi_backend.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'saptrangi_backend.wsgi.application'
+WSGI_APPLICATION = "saptrangi_backend.wsgi.application"
 
 # --------------------------------------------------
 # PASSWORD VALIDATION
 # --------------------------------------------------
 
 AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 # --------------------------------------------------
 # INTERNATIONALIZATION
 # --------------------------------------------------
 
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
@@ -173,24 +174,24 @@ USE_TZ = True
 # STATIC & MEDIA (Cloudinary)
 # --------------------------------------------------
 
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticHashedCloudinaryStorage'
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+STATICFILES_STORAGE = "cloudinary_storage.storage.StaticHashedCloudinaryStorage"
 
 cloudinary.config(
     cloud_name="dcskqhiwb",
     api_key="688844436758916",
     api_secret="hdfkwHRw70SkOGP3Zlb4VkRQQzA",
-    secure=True
+    secure=True,
 )
 
 # --------------------------------------------------
 # DEFAULT PRIMARY KEY
 # --------------------------------------------------
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --------------------------------------------------
 # THIRD-PARTY KEYS

@@ -1,5 +1,5 @@
 import random
-from django.utils import timezone
+from django.conf import settings
 from django.contrib.auth import get_user_model
 
 from rest_framework.views import APIView
@@ -24,8 +24,7 @@ class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-        return Response(UserSerializer(user).data, status=200)
+        return Response(UserSerializer(request.user).data, status=200)
 
 
 # =============================================================
@@ -35,8 +34,11 @@ class UpdateProfile(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request):
-        user = request.user
-        serializer = UserSerializer(user, data=request.data, partial=True)
+        serializer = UserSerializer(
+            request.user,
+            data=request.data,
+            partial=True
+        )
 
         if serializer.is_valid():
             serializer.save()
@@ -61,10 +63,16 @@ class SendOTPView(APIView):
         mobile = request.data.get("mobile")
 
         if not mobile or len(mobile) != 10 or not mobile.isdigit():
-            return Response({"error": "Invalid mobile number"}, status=400)
+            return Response(
+                {"error": "Invalid mobile number"},
+                status=400
+            )
 
         # Invalidate old OTPs
-        OTP.objects.filter(mobile=mobile, is_used=False).update(is_used=True)
+        OTP.objects.filter(
+            mobile=mobile,
+            is_used=False
+        ).update(is_used=True)
 
         otp = str(random.randint(100000, 999999))
 
@@ -73,16 +81,20 @@ class SendOTPView(APIView):
             code=otp,
         )
 
-        sent = send_otp_msg91(mobile, otp)
+        if not send_otp_msg91(mobile, otp):
+            return Response(
+                {"error": "Failed to send OTP"},
+                status=500
+            )
 
-        if not sent:
-            return Response({"error": "Failed to send OTP"}, status=500)
-
-        return Response({"message": "OTP sent successfully"}, status=200)
+        return Response(
+            {"message": "OTP sent successfully"},
+            status=200
+        )
 
 
 # =============================================================
-# VERIFY OTP → LOGIN / REGISTER + JWT ISSUE
+# VERIFY OTP → LOGIN / REGISTER + JWT
 # =============================================================
 class VerifyOTPView(APIView):
     permission_classes = [AllowAny]
@@ -92,27 +104,34 @@ class VerifyOTPView(APIView):
         code = request.data.get("otp")
 
         if not mobile or not code:
-            return Response({"error": "Mobile + OTP required"}, status=400)
+            return Response(
+                {"error": "Mobile + OTP required"},
+                status=400
+            )
 
         try:
             otp_obj = OTP.objects.filter(
                 mobile=mobile,
                 code=code,
-                is_used=False,
+                is_used=False
             ).latest("created_at")
         except OTP.DoesNotExist:
-            return Response({"error": "Invalid OTP"}, status=400)
+            return Response(
+                {"error": "Invalid OTP"},
+                status=400
+            )
 
         if otp_obj.is_expired():
-            return Response({"error": "OTP Expired"}, status=400)
+            return Response(
+                {"error": "OTP Expired"},
+                status=400
+            )
 
         otp_obj.is_used = True
         otp_obj.save()
 
-        # Create or fetch user
         user, created = User.objects.get_or_create(mobile=mobile)
 
-        # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
         access_token = str(refresh.access_token)
 
@@ -125,14 +144,14 @@ class VerifyOTPView(APIView):
             status=200,
         )
 
-        # 🔐 SET REFRESH TOKEN IN HTTPONLY COOKIE
+        # 🔐 ENV-SAFE REFRESH TOKEN COOKIE
         response.set_cookie(
             key="refresh_token",
             value=str(refresh),
             httponly=True,
-            secure=True,      # REQUIRED on Render
-            samesite="None",  # REQUIRED for cross-origin
-            max_age=7 * 24 * 60 * 60,  # 7 days
+            secure=not settings.DEBUG,                   # False on localhost, True on Render
+            samesite="None" if not settings.DEBUG else "Lax",
+            max_age=7 * 24 * 60 * 60,                   # 7 days
         )
 
         return response
@@ -150,33 +169,32 @@ class RefreshTokenView(APIView):
         if not refresh_token:
             return Response(
                 {"detail": "Refresh token not found"},
-                status=status.HTTP_401_UNAUTHORIZED,
+                status=status.HTTP_401_UNAUTHORIZED
             )
 
         try:
             refresh = RefreshToken(refresh_token)
             access_token = str(refresh.access_token)
 
-            user_id = refresh["user_id"]
-            user = User.objects.get(id=user_id)
+            user = User.objects.get(id=refresh["user_id"])
 
             return Response(
                 {
                     "accessToken": access_token,
                     "user": UserSerializer(user).data,
                 },
-                status=status.HTTP_200_OK,
+                status=status.HTTP_200_OK
             )
 
         except TokenError:
             return Response(
                 {"detail": "Invalid or expired refresh token"},
-                status=status.HTTP_401_UNAUTHORIZED,
+                status=status.HTTP_401_UNAUTHORIZED
             )
         except User.DoesNotExist:
             return Response(
                 {"detail": "User not found"},
-                status=status.HTTP_401_UNAUTHORIZED,
+                status=status.HTTP_401_UNAUTHORIZED
             )
 
 
@@ -195,42 +213,67 @@ class AddressView(APIView):
             serializer.save()
             return Response(
                 {"message": "Address Added", "data": serializer.data},
-                status=201,
+                status=201
             )
+
         return Response(serializer.errors, status=400)
 
     def get(self, request):
         addresses = Address.objects.filter(user=request.user)
         return Response(
             AddressSerializer(addresses, many=True).data,
-            status=200,
+            status=200
         )
 
     def put(self, request):
         address_id = request.data.get("id")
 
         if not address_id:
-            return Response({"error": "Address ID required"}, status=400)
+            return Response(
+                {"error": "Address ID required"},
+                status=400
+            )
 
         try:
-            address = Address.objects.get(id=address_id, user=request.user)
+            address = Address.objects.get(
+                id=address_id,
+                user=request.user
+            )
         except Address.DoesNotExist:
-            return Response({"error": "Address not found"}, status=404)
+            return Response(
+                {"error": "Address not found"},
+                status=404
+            )
 
-        serializer = AddressSerializer(address, data=request.data, partial=True)
+        serializer = AddressSerializer(
+            address,
+            data=request.data,
+            partial=True
+        )
+
         if serializer.is_valid():
             serializer.save()
             return Response(
                 {"message": "Address Updated", "data": serializer.data},
-                status=200,
+                status=200
             )
+
         return Response(serializer.errors, status=400)
 
     def delete(self, request):
         address_id = request.data.get("id")
 
         try:
-            Address.objects.get(id=address_id, user=request.user).delete()
-            return Response({"message": "Address Deleted"}, status=200)
+            Address.objects.get(
+                id=address_id,
+                user=request.user
+            ).delete()
+            return Response(
+                {"message": "Address Deleted"},
+                status=200
+            )
         except Address.DoesNotExist:
-            return Response({"error": "Address not found"}, status=404)
+            return Response(
+                {"error": "Address not found"},
+                status=404
+            )
