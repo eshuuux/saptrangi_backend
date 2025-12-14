@@ -1,14 +1,20 @@
 import random
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
-from django.utils import timezone
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
+
 from .utils import send_otp_msg91
-from .models import User, OTP, Address
+from .models import OTP, Address
 from .serializers import UserSerializer, AddressSerializer
+
+User = get_user_model()
 
 
 # =============================================================
@@ -18,10 +24,8 @@ class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """Return logged-in user profile"""
-        user = request.user  # Retrieved from token
+        user = request.user
         return Response(UserSerializer(user).data, status=200)
-
 
 
 # =============================================================
@@ -31,26 +35,28 @@ class UpdateProfile(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request):
-        """Update profile fields except mobile"""
         user = request.user
         serializer = UserSerializer(user, data=request.data, partial=True)
 
         if serializer.is_valid():
             serializer.save()
-            return Response({
-                "message": "Profile Updated Successfully",
-                "data": serializer.data
-            }, status=200)
+            return Response(
+                {
+                    "message": "Profile Updated Successfully",
+                    "data": serializer.data,
+                },
+                status=200,
+            )
 
         return Response(serializer.errors, status=400)
 
 
-
 # =============================================================
-# SEND OTP FOR LOGIN / REGISTER
+# SEND OTP
 # =============================================================
-
 class SendOTPView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         mobile = request.data.get("mobile")
 
@@ -64,7 +70,7 @@ class SendOTPView(APIView):
 
         OTP.objects.create(
             mobile=mobile,
-            code=otp
+            code=otp,
         )
 
         sent = send_otp_msg91(mobile, otp)
@@ -72,15 +78,15 @@ class SendOTPView(APIView):
         if not sent:
             return Response({"error": "Failed to send OTP"}, status=500)
 
-        return Response({
-            "message": "OTP sent successfully"
-        }, status=200)
+        return Response({"message": "OTP sent successfully"}, status=200)
 
 
 # =============================================================
-# VERIFY OTP → LOGIN OR REGISTER + JWT ISSUE
+# VERIFY OTP → LOGIN / REGISTER + JWT ISSUE
 # =============================================================
 class VerifyOTPView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         mobile = request.data.get("mobile")
         code = request.data.get("otp")
@@ -89,7 +95,11 @@ class VerifyOTPView(APIView):
             return Response({"error": "Mobile + OTP required"}, status=400)
 
         try:
-            otp_obj = OTP.objects.filter(mobile=mobile, code=code, is_used=False).latest("created_at")
+            otp_obj = OTP.objects.filter(
+                mobile=mobile,
+                code=code,
+                is_used=False,
+            ).latest("created_at")
         except OTP.DoesNotExist:
             return Response({"error": "Invalid OTP"}, status=400)
 
@@ -99,24 +109,83 @@ class VerifyOTPView(APIView):
         otp_obj.is_used = True
         otp_obj.save()
 
-        # Create user if not exists
+        # Create or fetch user
         user, created = User.objects.get_or_create(mobile=mobile)
 
-        # Generate JWT Tokens
+        # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
 
-        return Response({
-            "message": "Logged in Successfully" if not created else "Registered + Logged in",
-            "user": UserSerializer(user).data,
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-        }, status=200)
+        response = Response(
+            {
+                "message": "Registered + Logged in" if created else "Logged in Successfully",
+                "user": UserSerializer(user).data,
+                "accessToken": access_token,
+            },
+            status=200,
+        )
+
+        # 🔐 SET REFRESH TOKEN IN HTTPONLY COOKIE
+        response.set_cookie(
+            key="refresh_token",
+            value=str(refresh),
+            httponly=True,
+            secure=True,      # REQUIRED on Render
+            samesite="None",  # REQUIRED for cross-origin
+            max_age=7 * 24 * 60 * 60,  # 7 days
+        )
+
+        return response
 
 
+# =============================================================
+# REFRESH TOKEN → NEW ACCESS TOKEN
+# =============================================================
+class RefreshTokenView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get("refresh_token")
+
+        if not refresh_token:
+            return Response(
+                {"detail": "Refresh token not found"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        try:
+            refresh = RefreshToken(refresh_token)
+            access_token = str(refresh.access_token)
+
+            user_id = refresh["user_id"]
+            user = User.objects.get(id=user_id)
+
+            return Response(
+                {
+                    "accessToken": access_token,
+                    "user": UserSerializer(user).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except TokenError:
+            return Response(
+                {"detail": "Invalid or expired refresh token"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+
+# =============================================================
+# ADDRESS CRUD (JWT Protected)
+# =============================================================
 class AddressView(APIView):
     permission_classes = [IsAuthenticated]
 
-    # Create New Address
     def post(self, request):
         data = request.data.copy()
         data["user"] = request.user.id
@@ -124,17 +193,22 @@ class AddressView(APIView):
         serializer = AddressSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
-            return Response({"message": "Address Added", "data": serializer.data}, status=201)
+            return Response(
+                {"message": "Address Added", "data": serializer.data},
+                status=201,
+            )
         return Response(serializer.errors, status=400)
 
-    # List All Addresses
     def get(self, request):
         addresses = Address.objects.filter(user=request.user)
-        return Response(AddressSerializer(addresses, many=True).data, status=200)
+        return Response(
+            AddressSerializer(addresses, many=True).data,
+            status=200,
+        )
 
-    # Update Address
     def put(self, request):
         address_id = request.data.get("id")
+
         if not address_id:
             return Response({"error": "Address ID required"}, status=400)
 
@@ -146,10 +220,12 @@ class AddressView(APIView):
         serializer = AddressSerializer(address, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response({"message": "Address Updated", "data": serializer.data}, status=200)
+            return Response(
+                {"message": "Address Updated", "data": serializer.data},
+                status=200,
+            )
         return Response(serializer.errors, status=400)
 
-    # Delete Address
     def delete(self, request):
         address_id = request.data.get("id")
 
