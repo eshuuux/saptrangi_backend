@@ -10,12 +10,10 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
-from .utils import send_otp_msg91
 from .models import OTP, Address
 from .serializers import UserSerializer, AddressSerializer
 
 User = get_user_model()
-
 
 # =============================================================
 # USER PROFILE (JWT Protected)
@@ -24,8 +22,10 @@ class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(UserSerializer(request.user).data, status=200)
-
+        return Response(
+            UserSerializer(request.user).data,
+            status=status.HTTP_200_OK
+        )
 
 # =============================================================
 # UPDATE USER PROFILE (JWT Protected)
@@ -47,14 +47,13 @@ class UpdateProfile(APIView):
                     "message": "Profile Updated Successfully",
                     "data": serializer.data,
                 },
-                status=200,
+                status=status.HTTP_200_OK
             )
 
-        return Response(serializer.errors, status=400)
-
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # =============================================================
-# SEND OTP
+# SEND OTP (DEV MODE – OTP SHOWN IN RESPONSE)
 # =============================================================
 class SendOTPView(APIView):
     permission_classes = [AllowAny]
@@ -62,49 +61,36 @@ class SendOTPView(APIView):
     def post(self, request):
         mobile = request.data.get("mobile")
 
+        # Validate mobile
         if not mobile or len(mobile) != 10 or not mobile.isdigit():
             return Response(
                 {"error": "Invalid mobile number"},
-                status=400
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Invalidate old OTPs
+        # Invalidate previous OTPs
         OTP.objects.filter(
             mobile=mobile,
             is_used=False
         ).update(is_used=True)
 
+        # Generate OTP
         otp = str(random.randint(100000, 999999))
 
         OTP.objects.create(
             mobile=mobile,
-            code=otp,
+            code=otp
         )
 
-        # 🔴 PROD → Send via MSG91
-        if not settings.DEBUG:
-            if not send_otp_msg91(mobile, otp):
-                return Response(
-                    {"error": "Failed to send OTP"},
-                    status=500
-                )
-
-            return Response(
-                {"message": "OTP sent successfully"},
-                status=200
-            )
-
-        # 🟢 DEV → SHOW OTP IN RESPONSE
+        # DEV RESPONSE (OTP VISIBLE)
         return Response(
             {
                 "message": "OTP sent (DEV MODE)",
                 "mobile": mobile,
-                "otp_demo": otp   # 👈 visible in Postman
+                "otp": otp
             },
-            status=200
+            status=status.HTTP_200_OK
         )
-
-
 
 # =============================================================
 # VERIFY OTP → LOGIN / REGISTER + JWT
@@ -114,23 +100,17 @@ class VerifyOTPView(APIView):
 
     def post(self, request):
         mobile = request.data.get("mobile")
-        code = request.data.get("otp")
+        otp_code = request.data.get("otp")
 
-        # -----------------------------
-        # Basic validation
-        # -----------------------------
-        if not mobile or not code:
+        if not mobile or not otp_code:
             return Response(
                 {"error": "Mobile and OTP are required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # -----------------------------
-        # Fetch latest unused OTP
-        # -----------------------------
         otp_obj = OTP.objects.filter(
             mobile=mobile,
-            code=code,
+            code=otp_code,
             is_used=False
         ).first()
 
@@ -140,24 +120,17 @@ class VerifyOTPView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # -----------------------------
-        # Expiry check
-        # -----------------------------
         if otp_obj.is_expired():
             return Response(
-                {"error": "OTP Expired"},
+                {"error": "OTP expired"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # -----------------------------
-        # Mark OTP as used
-        # -----------------------------
+        # Mark OTP used
         otp_obj.is_used = True
         otp_obj.save(update_fields=["is_used"])
 
-        # -----------------------------
-        # Create / Fetch user
-        # -----------------------------
+        # Create or get user
         user, created = User.objects.get_or_create(mobile=mobile)
 
         try:
@@ -169,34 +142,29 @@ class VerifyOTPView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        # -----------------------------
-        # Response
-        # -----------------------------
         response = Response(
             {
-                "message": "Registration + Login successful" if created else "Login successful",
+                "message": "Registered + Logged in" if created else "Logged in Successfully",
                 "user": UserSerializer(user).data,
                 "accessToken": access_token,
             },
             status=status.HTTP_200_OK
         )
 
-        # -----------------------------
-        # Secure Refresh Token Cookie
-        # -----------------------------
+        # Refresh token cookie
         response.set_cookie(
             key="refresh_token",
             value=str(refresh),
             httponly=True,
-            secure=not settings.DEBUG,  # False locally, True on Render
+            secure=not settings.DEBUG,
             samesite="None" if not settings.DEBUG else "Lax",
-            max_age=7 * 24 * 60 * 60,   # 7 days
+            max_age=7 * 24 * 60 * 60,
         )
 
         return response
 
 # =============================================================
-# REFRESH TOKEN → NEW ACCESS TOKEN
+# REFRESH ACCESS TOKEN
 # =============================================================
 class RefreshTokenView(APIView):
     permission_classes = [AllowAny]
@@ -206,14 +174,13 @@ class RefreshTokenView(APIView):
 
         if not refresh_token:
             return Response(
-                {"detail": "Refresh token not found"},
+                {"error": "Refresh token not found"},
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
         try:
             refresh = RefreshToken(refresh_token)
             access_token = str(refresh.access_token)
-
             user = User.objects.get(id=refresh["user_id"])
 
             return Response(
@@ -224,17 +191,11 @@ class RefreshTokenView(APIView):
                 status=status.HTTP_200_OK
             )
 
-        except TokenError:
+        except (TokenError, User.DoesNotExist):
             return Response(
-                {"detail": "Invalid or expired refresh token"},
+                {"error": "Invalid refresh token"},
                 status=status.HTTP_401_UNAUTHORIZED
             )
-        except User.DoesNotExist:
-            return Response(
-                {"detail": "User not found"},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
 
 # =============================================================
 # ADDRESS CRUD (JWT Protected)
@@ -251,16 +212,16 @@ class AddressView(APIView):
             serializer.save()
             return Response(
                 {"message": "Address Added", "data": serializer.data},
-                status=201
+                status=status.HTTP_201_CREATED
             )
 
-        return Response(serializer.errors, status=400)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def get(self, request):
         addresses = Address.objects.filter(user=request.user)
         return Response(
             AddressSerializer(addresses, many=True).data,
-            status=200
+            status=status.HTTP_200_OK
         )
 
     def put(self, request):
@@ -269,49 +230,38 @@ class AddressView(APIView):
         if not address_id:
             return Response(
                 {"error": "Address ID required"},
-                status=400
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            address = Address.objects.get(
-                id=address_id,
-                user=request.user
-            )
+            address = Address.objects.get(id=address_id, user=request.user)
         except Address.DoesNotExist:
             return Response(
                 {"error": "Address not found"},
-                status=404
+                status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = AddressSerializer(
-            address,
-            data=request.data,
-            partial=True
-        )
-
+        serializer = AddressSerializer(address, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(
                 {"message": "Address Updated", "data": serializer.data},
-                status=200
+                status=status.HTTP_200_OK
             )
 
-        return Response(serializer.errors, status=400)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request):
         address_id = request.data.get("id")
 
         try:
-            Address.objects.get(
-                id=address_id,
-                user=request.user
-            ).delete()
+            Address.objects.get(id=address_id, user=request.user).delete()
             return Response(
                 {"message": "Address Deleted"},
-                status=200
+                status=status.HTTP_200_OK
             )
         except Address.DoesNotExist:
             return Response(
                 {"error": "Address not found"},
-                status=404
+                status=status.HTTP_404_NOT_FOUND
             )

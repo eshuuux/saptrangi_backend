@@ -51,7 +51,7 @@ INSTALLED_APPS = [
 ]
 
 # --------------------------------------------------
-# MIDDLEWARE (ORDER MATTERS)
+# MIDDLEWARE
 # --------------------------------------------------
 
 MIDDLEWARE = [
@@ -67,7 +67,7 @@ MIDDLEWARE = [
 ]
 
 # --------------------------------------------------
-# CORS + CSRF (ENV SAFE)
+# CORS + CSRF
 # --------------------------------------------------
 
 CORS_ALLOW_CREDENTIALS = True
@@ -82,7 +82,6 @@ CSRF_TRUSTED_ORIGINS = [
     "https://saptrangi.netlify.app",
 ]
 
-# 🔐 ENV-BASED COOKIE SETTINGS
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
 
@@ -194,12 +193,14 @@ cloudinary.config(
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --------------------------------------------------
-# THIRD-PARTY KEYS
+# PAYMENT KEYS (KEEP)
 # --------------------------------------------------
 
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
-MSG91_AUTH_KEY = os.getenv("MSG91_AUTH_KEY")
-MSG91_SENDER_ID = os.getenv("MSG91_SENDER_ID")
-MSG91_TEMPLATE_ID = os.getenv("MSG91_TEMPLATE_ID")
+# --------------------------------------------------
+# CUSTOM USER MODEL
+# --------------------------------------------------
+
+AUTH_USER_MODEL = "users.User"
