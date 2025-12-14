@@ -26,7 +26,7 @@ class AddToCartView(APIView):
 
         if not product_id:
             return Response({"error": "product_id is required"}, status=400)
-
+        
         try:
             product = Product.objects.get(id=product_id)
         except Product.DoesNotExist:

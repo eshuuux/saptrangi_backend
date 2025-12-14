@@ -1,12 +1,32 @@
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 
 
 # =============================================================
-# USER MODEL (SIMPLE – OTP BASED)
+# USER MANAGER
 # =============================================================
-class User(models.Model):
+class UserManager(BaseUserManager):
+    def create_user(self, mobile, password=None, **extra_fields):
+        if not mobile:
+            raise ValueError("Mobile number is required")
+
+        user = self.model(mobile=mobile, **extra_fields)
+        user.set_password(password or None)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, mobile, password, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        return self.create_user(mobile, password, **extra_fields)
+
+
+# =============================================================
+# USER MODEL (OTP BASED + AUTH COMPATIBLE)
+# =============================================================
+class User(AbstractBaseUser, PermissionsMixin):
     mobile = models.CharField(max_length=10, unique=True)
 
     first_name = models.CharField(max_length=100, blank=True, null=True)
@@ -14,14 +34,21 @@ class User(models.Model):
     email      = models.EmailField(blank=True, null=True)
     gender     = models.CharField(max_length=10, blank=True, null=True)
 
-    is_active  = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    is_staff  = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = UserManager()
+
+    USERNAME_FIELD = "mobile"
+    REQUIRED_FIELDS = []
 
     class Meta:
         db_table = "users"
         ordering = ["-created_at"]
 
-    def _str_(self):
+    def __str__(self):
         return self.mobile
 
 
@@ -41,7 +68,7 @@ class OTP(models.Model):
     def is_expired(self):
         return timezone.now() > self.created_at + timedelta(minutes=5)
 
-    def _str_(self):
+    def __str__(self):
         return f"{self.mobile} - {self.code}"
 
 
@@ -61,11 +88,7 @@ class Address(models.Model):
 
     address_type = models.CharField(
         max_length=20,
-        choices=[
-            ("Home", "Home"),
-            ("Work", "Work"),
-            ("Other", "Other")
-        ],
+        choices=[("Home", "Home"), ("Work", "Work"), ("Other", "Other")],
         default="Home"
     )
 
@@ -74,5 +97,5 @@ class Address(models.Model):
     class Meta:
         db_table = "addresses"
 
-    def _str_(self):
+    def __str__(self):
         return f"{self.user.mobile} - {self.city}"
