@@ -1,6 +1,5 @@
 import random
 from django.conf import settings
-from django.contrib.auth import get_user_model
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -10,11 +9,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
-from .models import OTP, Address
+from .models import OTP, Address, User
 from .serializers import UserSerializer, AddressSerializer
-
-User = get_user_model()
-
 # =============================================================
 # USER PROFILE (JWT Protected)
 # =============================================================
