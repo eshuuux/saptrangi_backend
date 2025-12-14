@@ -166,18 +166,35 @@ class RefreshTokenView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        refresh_token = request.COOKIES.get("refresh_token")
-
-        if not refresh_token:
-            return Response(
-                {"error": "Refresh token not found"},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
         try:
+            # -----------------------------
+            # Get refresh token from cookie
+            # -----------------------------
+            refresh_token = request.COOKIES.get("refresh_token")
+
+            if not refresh_token:
+                return Response(
+                    {"error": "Refresh token missing"},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+
+            # -----------------------------
+            # Decode refresh token
+            # -----------------------------
             refresh = RefreshToken(refresh_token)
             access_token = str(refresh.access_token)
-            user = User.objects.get(id=refresh["user_id"])
+
+            # -----------------------------
+            # Get user safely
+            # -----------------------------
+            user_id = refresh.get("user_id")
+            user = User.objects.filter(id=user_id).first()
+
+            if not user:
+                return Response(
+                    {"error": "User not found"},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
 
             return Response(
                 {
@@ -187,12 +204,18 @@ class RefreshTokenView(APIView):
                 status=status.HTTP_200_OK
             )
 
-        except (TokenError, User.DoesNotExist):
+        except TokenError:
             return Response(
-                {"error": "Invalid refresh token"},
+                {"error": "Invalid or expired refresh token"},
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
+        except Exception as e:
+            # prevents 500 crash
+            return Response(
+                {"error": "Refresh failed", "detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 # =============================================================
 # ADDRESS CRUD (JWT Protected)
 # =============================================================
