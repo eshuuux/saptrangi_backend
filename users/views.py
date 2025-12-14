@@ -149,13 +149,14 @@ class VerifyOTPView(APIView):
 
         # Refresh token cookie
         response.set_cookie(
-            key="refresh_token",
-            value=str(refresh),
-            httponly=True,
-            secure=not settings.DEBUG,
-            samesite="None" if not settings.DEBUG else "Lax",
-            max_age=7 * 24 * 60 * 60,
-        )
+        key="refresh_token",
+        value=str(refresh),
+        httponly=True,
+        secure=True,        # 🔥 ALWAYS TRUE on Render
+        samesite="None",    # 🔥 REQUIRED for cross-site
+        max_age=7 * 24 * 60 * 60,
+)
+
 
         return response
 
@@ -216,6 +217,7 @@ class RefreshTokenView(APIView):
                 {"error": "Refresh failed", "detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
 # =============================================================
 # ADDRESS CRUD (JWT Protected)
 # =============================================================
