@@ -81,16 +81,29 @@ class SendOTPView(APIView):
             code=otp,
         )
 
-        if not send_otp_msg91(mobile, otp):
+        # 🔴 PROD → Send via MSG91
+        if not settings.DEBUG:
+            if not send_otp_msg91(mobile, otp):
+                return Response(
+                    {"error": "Failed to send OTP"},
+                    status=500
+                )
+
             return Response(
-                {"error": "Failed to send OTP"},
-                status=500
+                {"message": "OTP sent successfully"},
+                status=200
             )
 
+        # 🟢 DEV → SHOW OTP IN RESPONSE
         return Response(
-            {"message": "OTP sent successfully"},
+            {
+                "message": "OTP sent (DEV MODE)",
+                "mobile": mobile,
+                "otp_demo": otp   # 👈 visible in Postman
+            },
             status=200
         )
+
 
 
 # =============================================================
