@@ -7,18 +7,31 @@ from products.models import Product
 # ===================================================================
 # 🛒 CART TABLE — Temporary storage before checkout
 # ===================================================================
+# ===================================================================
+# 🛒 CART TABLE — Temporary storage before checkout
+# ===================================================================
 class Cart(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, db_index=True)        # faster lookup
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, db_index=True)  # speed on joins
-    quantity = models.PositiveIntegerField(default=1)  # Prevent negative values
+    user = models.ForeignKey(User, on_delete=models.CASCADE, db_index=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, db_index=True)
+
+    size = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        help_text="Selected size like S, M, L, XL"
+    )
+
+    quantity = models.PositiveIntegerField(default=1)
     added_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "cart"
-        unique_together = ("user", "product")   # avoid duplicates
+        unique_together = ("user", "product", "size")  # 🔥 IMPORTANT
+        ordering = ["-id"]
 
     def __str__(self):
-        return f"{self.user.mobile} - {self.product.name} ({self.quantity})"
+        return f"{self.user.mobile} - {self.product.name} ({self.size}) x {self.quantity}"
+
 
 
 
@@ -56,6 +69,7 @@ class Order(models.Model):
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items", db_index=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, db_index=True)
+    size = models.CharField(max_length=10, blank=True, null=True)
     quantity = models.PositiveIntegerField(default=1)
     price = models.FloatField()  # snapshot price at time of order
 

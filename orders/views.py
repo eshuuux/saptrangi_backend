@@ -2,15 +2,14 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
+from django.conf import settings
 
-from .models import Cart, Order, OrderItem
-from products.models import Product
+from .models import Cart, Order, OrderItem, Payment
 from .serializers import CartSerializer, OrderSerializer
+from products.models import Product
 from users.models import Address
 
 import razorpay
-from django.conf import settings
-from .models import Payment
 
 
 # ======================================================================
@@ -22,69 +21,137 @@ class AddToCartView(APIView):
     def post(self, request):
         user = request.user
         product_id = request.data.get("product_id")
+        size = request.data.get("size")
         quantity = int(request.data.get("quantity", 1))
 
-        if not product_id:
-            return Response({"error": "product_id is required"}, status=400)
-        
+        if not product_id or not size:
+            return Response(
+                {"error": "product_id and size are required"},
+                status=400
+            )
+
         try:
             product = Product.objects.get(id=product_id)
         except Product.DoesNotExist:
-            return Response({"error": "Invalid Product ID"}, status=404)
+            return Response({"error": "Invalid product"}, status=404)
 
-        cart_item, created = Cart.objects.get_or_create(user=user, product=product)
+        cart_item, created = Cart.objects.get_or_create(
+            user=user,
+            product=product,
+            size=size
+        )
 
         cart_item.quantity = cart_item.quantity + quantity if not created else quantity
         cart_item.save()
 
-        return Response({"message": "Added to cart", "cart": CartSerializer(cart_item).data}, status=200)
-
+        return Response(
+            {
+                "message": "Added to cart",
+                "cart": CartSerializer(cart_item).data
+            },
+            status=200
+        )
 
 
 # ======================================================================
-# 🛍 VIEW CART ITEMS
+# 🛍 VIEW CART
 # ======================================================================
 class CartView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         cart_items = Cart.objects.filter(user=request.user)
-        return Response({"cart": CartSerializer(cart_items, many=True).data}, status=200)
-
+        return Response(
+            {"cart": CartSerializer(cart_items, many=True).data},
+            status=200
+        )
 
 
 # ======================================================================
-# 🔁 UPDATE QUANTITY
+# 🔁 UPDATE QUANTITY (SIZE NOT REQUIRED HERE)
 # ======================================================================
-class UpdateCartView(APIView):
+class UpdateCartQuantityView(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request):
         cart_id = request.data.get("cart_id")
         quantity = request.data.get("quantity")
 
-        if not cart_id or not quantity:
-            return Response({"error": "cart_id & quantity required"}, status=400)
+        if not cart_id or quantity is None:
+            return Response(
+                {"error": "cart_id and quantity required"},
+                status=400
+            )
 
         try:
             cart = Cart.objects.get(id=cart_id, user=request.user)
         except Cart.DoesNotExist:
-            return Response({"error": "Item not found in cart"}, status=404)
+            return Response({"error": "Item not found"}, status=404)
 
         quantity = int(quantity)
 
         if quantity < 1:
             cart.delete()
-            return Response({"message": "Item removed from cart"}, status=200)
+            return Response({"message": "Item removed"}, status=200)
 
         cart.quantity = quantity
         cart.save()
-        return Response({"message": "Cart updated", "cart": CartSerializer(cart).data}, status=200)
 
+        return Response(
+            {"message": "Quantity updated", "cart": CartSerializer(cart).data},
+            status=200
+        )
 
 
 # ======================================================================
-# ❌ REMOVE ITEM FROM CART
+# 🔁 UPDATE SIZE (MERGE LOGIC)
+# ======================================================================
+class UpdateCartSizeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        cart_id = request.data.get("cart_id")
+        new_size = request.data.get("size")
+
+        if not cart_id or not new_size:
+            return Response(
+                {"error": "cart_id and size required"},
+                status=400
+            )
+
+        try:
+            cart_item = Cart.objects.get(id=cart_id, user=request.user)
+        except Cart.DoesNotExist:
+            return Response({"error": "Cart item not found"}, status=404)
+
+        # Check if same product + new size exists
+        existing_item = Cart.objects.filter(
+            user=request.user,
+            product=cart_item.product,
+            size=new_size
+        ).exclude(id=cart_item.id).first()
+
+        if existing_item:
+            existing_item.quantity += cart_item.quantity
+            existing_item.save()
+            cart_item.delete()
+
+            return Response(
+                {"message": "Size updated & items merged"},
+                status=200
+            )
+
+        cart_item.size = new_size
+        cart_item.save()
+
+        return Response(
+            {"message": "Size updated successfully"},
+            status=200
+        )
+
+
+# ======================================================================
+# ❌ REMOVE CART ITEM
 # ======================================================================
 class RemoveCartItemView(APIView):
     permission_classes = [IsAuthenticated]
@@ -103,9 +170,8 @@ class RemoveCartItemView(APIView):
             return Response({"error": "Item not found"}, status=404)
 
 
-
 # ======================================================================
-# ⚡ BUY NOW (Instant Order — Skip Cart)
+# ⚡ BUY NOW (SIZE REQUIRED)
 # ======================================================================
 class BuyNowView(APIView):
     permission_classes = [IsAuthenticated]
@@ -113,23 +179,21 @@ class BuyNowView(APIView):
     @transaction.atomic
     def post(self, request):
         product_id = request.data.get("product_id")
+        size = request.data.get("size")
         quantity = int(request.data.get("quantity", 1))
         address_id = request.data.get("address_id")
 
-        if not address_id:
-            return Response({"error": "address_id is required"}, status=400)
+        if not product_id or not size or not address_id:
+            return Response(
+                {"error": "product_id, size and address_id are required"},
+                status=400
+            )
 
-        # Validate Address
-        try:
-            address = Address.objects.get(id=address_id, user=request.user)
-        except Address.DoesNotExist:
-            return Response({"error": "Invalid address"}, status=404)
-
-        # Validate Product
         try:
             product = Product.objects.get(id=product_id)
-        except Product.DoesNotExist:
-            return Response({"error": "Invalid product"}, status=404)
+            address = Address.objects.get(id=address_id, user=request.user)
+        except (Product.DoesNotExist, Address.DoesNotExist):
+            return Response({"error": "Invalid product or address"}, status=404)
 
         quantity = max(1, quantity)
         total = product.price * quantity
@@ -143,15 +207,15 @@ class BuyNowView(APIView):
         OrderItem.objects.create(
             order=order,
             product=product,
+            size=size,
             quantity=quantity,
             price=product.price
         )
 
-        return Response({
-            "message": "Order Created Successfully",
-            "order": OrderSerializer(order).data
-        }, status=201)
-
+        return Response(
+            {"message": "Order created", "order": OrderSerializer(order).data},
+            status=201
+        )
 
 
 # ======================================================================
@@ -166,9 +230,8 @@ class PlaceOrderFromCartView(APIView):
         address_id = request.data.get("address_id")
 
         if not address_id:
-            return Response({"error": "address_id is required"}, status=400)
+            return Response({"error": "address_id required"}, status=400)
 
-        # Validate Address
         try:
             address = Address.objects.get(id=address_id, user=user)
         except Address.DoesNotExist:
@@ -190,33 +253,35 @@ class PlaceOrderFromCartView(APIView):
             OrderItem.objects.create(
                 order=order,
                 product=item.product,
+                size=item.size,
                 quantity=item.quantity,
                 price=item.product.price
             )
 
         cart_items.delete()
 
-        return Response({
-            "message": "Order Placed Successfully",
-            "order": OrderSerializer(order).data
-        }, status=201)
-
+        return Response(
+            {"message": "Order placed", "order": OrderSerializer(order).data},
+            status=201
+        )
 
 
 # ======================================================================
-# 📜 USER ORDER LIST
+# 📜 USER ORDERS
 # ======================================================================
 class OrderListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         orders = Order.objects.filter(user=request.user).order_by("-id")
-        return Response({"orders": OrderSerializer(orders, many=True).data}, status=200)
-
+        return Response(
+            {"orders": OrderSerializer(orders, many=True).data},
+            status=200
+        )
 
 
 # ======================================================================
-# 🔍 ORDER DETAILS WITH ITEMS
+# 🔍 ORDER DETAIL
 # ======================================================================
 class OrderDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -227,19 +292,21 @@ class OrderDetailView(APIView):
         except Order.DoesNotExist:
             return Response({"error": "Order not found"}, status=404)
 
-        return Response({"order": OrderSerializer(order).data}, status=200)
+        return Response(
+            {"order": OrderSerializer(order).data},
+            status=200
+        )
 
-import razorpay
-from django.conf import settings
-from .models import Payment
 
+# ======================================================================
+# 💳 RAZORPAY
+# ======================================================================
 class CreateRazorpayOrder(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         order_id = request.data.get("order_id")
 
-        # Validate order
         try:
             order = Order.objects.get(id=order_id, user=request.user)
         except Order.DoesNotExist:
@@ -250,12 +317,11 @@ class CreateRazorpayOrder(APIView):
         )
 
         razorpay_order = client.order.create({
-            "amount": int(order.total_amount * 100),   # convert to paise
+            "amount": int(order.total_amount * 100),
             "currency": "INR",
             "payment_capture": 1
         })
 
-        # Save razorpay order ID
         Payment.objects.create(
             order=order,
             razorpay_order_id=razorpay_order["id"]
@@ -266,83 +332,4 @@ class CreateRazorpayOrder(APIView):
             "order_id": razorpay_order["id"],
             "amount": order.total_amount,
             "currency": "INR"
-        }, status=200)
-
-class VerifyRazorpayPayment(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        order_id = request.data.get("order_id")
-        payment_id = request.data.get("razorpay_payment_id")
-        razorpay_order_id = request.data.get("razorpay_order_id")
-        signature = request.data.get("razorpay_signature")
-
-        # Get payment record
-        try:
-            payment = Payment.objects.get(razorpay_order_id=razorpay_order_id)
-        except Payment.DoesNotExist:
-            return Response({"error": "Payment record not found"}, status=404)
-
-        client = razorpay.Client(
-            auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
-        )
-
-        # Signature verification
-        try:
-            client.utility.verify_payment_signature({
-                'razorpay_payment_id': payment_id,
-                'razorpay_order_id': razorpay_order_id,
-                'razorpay_signature': signature
-            })
-        except:
-            return Response({"error": "Signature verification failed"}, status=400)
-
-        # Update payment record
-        payment.razorpay_payment_id = payment_id
-        payment.razorpay_signature = signature
-        payment.is_paid = True
-        payment.save()
-
-        # Update order status
-        payment.order.status = "Confirmed"
-        payment.order.save()
-
-        return Response({"message": "Payment Verified Successfully"}, status=200)
-
-class AdminUpdateOrderStatus(APIView):
-    """
-    Admin can update order status:
-    Pending → Confirmed → Shipped → Out for Delivery → Delivered → Cancelled
-    """
-    
-    # ⚠️ In future you can add admin authentication
-    # permission_classes = [IsAdminUser]
-
-    def put(self, request):
-        order_id = request.data.get("order_id")
-        new_status = request.data.get("status")
-
-        if not order_id or not new_status:
-            return Response({"error": "order_id and status required"}, status=400)
-
-        # Check if valid choice
-        valid_statuses = [
-            "Pending", "Confirmed", "Shipped",
-            "Out for Delivery", "Delivered", "Cancelled"
-        ]
-
-        if new_status not in valid_statuses:
-            return Response({"error": "Invalid status"}, status=400)
-
-        try:
-            order = Order.objects.get(id=order_id)
-        except Order.DoesNotExist:
-            return Response({"error": "Order not found"}, status=404)
-
-        order.status = new_status
-        order.save()
-
-        return Response({
-            "message": "Order status updated",
-            "order": OrderSerializer(order).data
         }, status=200)
