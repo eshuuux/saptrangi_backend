@@ -36,7 +36,7 @@ urlpatterns = [
 
     # ❌ Remove item
     path(
-        "cart/remove/",
+        "cart/remove/<int:cart_id>/",
         RemoveCartItemView.as_view(),
         name="remove-cart-item"
     ),

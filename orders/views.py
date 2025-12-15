@@ -214,7 +214,7 @@ class UpdateCartSizeView(APIView):
 class RemoveCartItemView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def delete(self, request):
+    def delete(self, request, cart_id):
         cart_id = request.data.get("cart_id")
 
         if not cart_id:
