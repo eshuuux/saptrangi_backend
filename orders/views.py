@@ -12,6 +12,63 @@ from users.models import Address
 import razorpay
 
 
+from rest_framework.permissions import IsAdminUser
+
+
+class AdminUpdateOrderStatus(APIView):
+    """
+    Admin can update order status:
+    Pending → Confirmed → Shipped → Out for Delivery → Delivered → Cancelled
+    """
+    permission_classes = [IsAuthenticated]  # later you can change to IsAdminUser
+
+    def put(self, request):
+        order_id = request.data.get("order_id")
+        status_value = request.data.get("status")
+
+        if not order_id or not status_value:
+            return Response(
+                {"error": "order_id and status are required"},
+                status=400
+            )
+
+        valid_statuses = [
+            "Pending",
+            "Confirmed",
+            "Shipped",
+            "Out for Delivery",
+            "Delivered",
+            "Cancelled"
+        ]
+
+        if status_value not in valid_statuses:
+            return Response(
+                {"error": "Invalid status"},
+                status=400
+            )
+
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=404
+            )
+
+        order.status = status_value
+        order.save()
+
+        return Response(
+            {
+                "message": "Order status updated successfully",
+                "order": OrderSerializer(order).data
+            },
+            status=200
+        )
+
+
+
+
 # ======================================================================
 # 🛒 ADD PRODUCT TO CART
 # ======================================================================
@@ -65,6 +122,7 @@ class CartView(APIView):
             {"cart": CartSerializer(cart_items, many=True).data},
             status=200
         )
+
 
 
 # ======================================================================
@@ -333,3 +391,58 @@ class CreateRazorpayOrder(APIView):
             "amount": order.total_amount,
             "currency": "INR"
         }, status=200)
+class VerifyRazorpayPayment(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        razorpay_order_id = request.data.get("razorpay_order_id")
+        razorpay_payment_id = request.data.get("razorpay_payment_id")
+        razorpay_signature = request.data.get("razorpay_signature")
+
+        if not razorpay_order_id or not razorpay_payment_id or not razorpay_signature:
+            return Response(
+                {"error": "Missing payment details"},
+                status=400
+            )
+
+        try:
+            payment = Payment.objects.get(
+                razorpay_order_id=razorpay_order_id
+            )
+        except Payment.DoesNotExist:
+            return Response(
+                {"error": "Payment record not found"},
+                status=404
+            )
+
+        client = razorpay.Client(
+            auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+        )
+
+        try:
+            client.utility.verify_payment_signature({
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": razorpay_payment_id,
+                "razorpay_signature": razorpay_signature,
+            })
+        except razorpay.errors.SignatureVerificationError:
+            return Response(
+                {"error": "Payment verification failed"},
+                status=400
+            )
+
+        # ✅ Mark payment success
+        payment.razorpay_payment_id = razorpay_payment_id
+        payment.razorpay_signature = razorpay_signature
+        payment.is_paid = True
+        payment.save()
+
+        # ✅ Update order status
+        order = payment.order
+        order.status = "Confirmed"
+        order.save()
+
+        return Response(
+            {"message": "Payment verified successfully"},
+            status=200
+        )
