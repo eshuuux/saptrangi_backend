@@ -215,8 +215,6 @@ class RemoveCartItemView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, cart_id):
-        cart_id = request.data.get("cart_id")
-
         if not cart_id:
             return Response({"error": "cart_id required"}, status=400)
 
