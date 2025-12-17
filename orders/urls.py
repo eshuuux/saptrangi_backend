@@ -14,7 +14,7 @@ from .views import (
 
 urlpatterns = [
     # CART
-    path("", CartView.as_view()),                      # GET
+    path("items/", CartView.as_view()),                      # GET
     path("add/", AddToCartView.as_view()),           # POST
     path("update/quantity/", UpdateCartQuantityView.as_view()),
     path("update/size/", UpdateCartSizeView.as_view()),
@@ -22,7 +22,7 @@ urlpatterns = [
 
     # ORDERS
     path("list/", OrderListView.as_view()),                  # GET
-    path("<int:order_id>/", OrderDetailView.as_view()),
+    path("details/<int:order_id>/", OrderDetailView.as_view()),
     path("buy-now/", BuyNowView.as_view()),
     path("checkout/", PlaceOrderFromCartView.as_view()),
 ]

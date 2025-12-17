@@ -9,7 +9,7 @@ urlpatterns = [
     path("banners/", BannerView.as_view()),
     path("carousel/", CarouselView.as_view()),
     path("category/<str:category>/", ProductDetailByCategory.as_view()),
-    path("<slug:slug>/", ProductDetailBySlug.as_view()),  # GET
-    path("", ProductView.as_view()),                      # GET, POST
+    path("details/<slug:slug>/", ProductDetailBySlug.as_view()),  # GET
+    path("/admin", ProductView.as_view()),                      # GET, POST
 ]
 
