@@ -230,7 +230,6 @@ class HomeView(APIView):
                     "name","price","mrp","discount","rating","main_image","hover_image","slug"
                 )
             )
-
         return Response({
             "carousel" : carousel,
             "top_picks" : top_picks,

@@ -83,7 +83,8 @@ class Address(models.Model):
     pincode = models.CharField(max_length=10)
     state = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
-    house_no = models.CharField(max_length=255)
+    street = models.CharField(max_length=255)
+    landmark = models.CharField(max_length=255)
     area = models.CharField(max_length=255)
     address_type = models.CharField(max_length=20, default="Home")
 
