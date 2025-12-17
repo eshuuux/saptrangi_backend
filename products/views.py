@@ -215,7 +215,6 @@ class BannerView(APIView):
 # =============================================================
 class HomeView(APIView):
     def get(self, request):
-
         carousel = list(Carousel.objects.all()[:4].values("desktop_image", "mobile_image"))
         top_picks = list(Product.objects.filter(top_picks=True).order_by("-id")[:12].values(
             "name","price","mrp","discount","rating","main_image","hover_image","slug"
@@ -227,9 +226,7 @@ class HomeView(APIView):
         for b in banners:
             product_map[b["category"]] = list(
                 Product.objects.filter(category=b["category"])[:10].values(
-                    "name","price","mrp","discount","rating","main_image","hover_image","slug"
-                )
-            )
+                    "name","price","mrp","discount","rating","main_image","hover_image","slug"))
         return Response({
             "carousel" : carousel,
             "top_picks" : top_picks,

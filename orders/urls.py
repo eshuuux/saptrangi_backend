@@ -21,7 +21,7 @@ urlpatterns = [
     path("remove/<int:cart_id>/", RemoveCartItemView.as_view()),
 
     # ORDERS
-    path("", OrderListView.as_view()),                  # GET
+    path("list/", OrderListView.as_view()),                  # GET
     path("<int:order_id>/", OrderDetailView.as_view()),
     path("buy-now/", BuyNowView.as_view()),
     path("checkout/", PlaceOrderFromCartView.as_view()),
