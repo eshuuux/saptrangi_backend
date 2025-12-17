@@ -11,7 +11,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = '__all__'
+        fields = '__all__'  # (email,createdat,first,lastname,gender,id,isactive,mobile,)
         read_only_fields = ['mobile', 'created_at']   # mobile login only — not editable
 
 
@@ -29,5 +29,5 @@ class UserSerializer(serializers.ModelSerializer):
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
-        fields = "__all__"
-        read_only_fields = ["user"]
+        exclude = ["user"]   # user comes from request
+

@@ -223,19 +223,11 @@ class RefreshTokenView(APIView):
 # =============================================================
 class AddressView(APIView):
     permission_classes = [IsAuthenticated]
-
     def post(self, request):
-        data = request.data.copy()
-        data["user"] = request.user.id
-
-        serializer = AddressSerializer(data=data)
+        serializer = AddressSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(
-                {"message": "Address Added", "data": serializer.data},
-                status=status.HTTP_201_CREATED
-            )
-
+            serializer.save(user=request.user)  # 🔥 FIX
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def get(self, request):

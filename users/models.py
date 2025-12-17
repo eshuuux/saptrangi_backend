@@ -85,12 +85,7 @@ class Address(models.Model):
     city = models.CharField(max_length=100)
     house_no = models.CharField(max_length=255)
     area = models.CharField(max_length=255)
-
-    address_type = models.CharField(
-        max_length=20,
-        choices=[("Home", "Home"), ("Work", "Work"), ("Other", "Other")],
-        default="Home"
-    )
+    address_type = models.CharField(max_length=20, default="Home")
 
     created_at = models.DateTimeField(auto_now_add=True)
 

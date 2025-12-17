@@ -15,10 +15,10 @@ from .views import (
 urlpatterns = [
     # CART
     path("", CartView.as_view()),                      # GET
-    path("items/", AddToCartView.as_view()),           # POST
-    path("items/<int:id>/quantity/", UpdateCartQuantityView.as_view()),
-    path("items/<int:id>/size/", UpdateCartSizeView.as_view()),
-    path("items/<int:id>/", RemoveCartItemView.as_view()),
+    path("add/", AddToCartView.as_view()),           # POST
+    path("update/quantity/", UpdateCartQuantityView.as_view()),
+    path("update/size/", UpdateCartSizeView.as_view()),
+    path("remove/<int:cart_id>/", RemoveCartItemView.as_view()),
 
     # ORDERS
     path("", OrderListView.as_view()),                  # GET
