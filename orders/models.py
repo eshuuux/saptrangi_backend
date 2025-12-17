@@ -78,18 +78,3 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f"{self.order.id} - {self.product.name}"
-
-class Payment(models.Model):
-    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="payment")
-    razorpay_order_id = models.CharField(max_length=200)
-    razorpay_payment_id = models.CharField(max_length=200, blank=True, null=True)
-    razorpay_signature = models.CharField(max_length=200, blank=True, null=True)
-    is_paid = models.BooleanField(default=False)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = "payments"
-
-    def __str__(self):
-        return f"Payment for Order {self.order.id}"

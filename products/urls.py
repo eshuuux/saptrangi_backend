@@ -5,13 +5,12 @@ from .views import (
 )
 
 urlpatterns = [
-    # ------------------ HOMEPAGE ROUTES ------------------ #
-    path("home/", HomeView.as_view(), name="home-data"),  # All homepage data
-    # ------------------ PRODUCT ROUTES ------------------- #
-    path("products/", ProductView.as_view(), name="all-products"),  # GET + POST
-    path("products/<slug:slug>/", ProductDetailBySlug.as_view(), name="product-detail"),
-    path("products/category/<str:category>/", ProductDetailByCategory.as_view(), name="product-by-category"),
-    # ------------------ BANNER & CAROUSEL ---------------- #
-    path("banners/", BannerView.as_view(), name="banners"),
-    path("carousel/", CarouselView.as_view(), name="carousel"),
+    path("", ProductView.as_view()),                      # GET, POST
+    path("<slug:slug>/", ProductDetailBySlug.as_view()),  # GET
+    path("category/<str:category>/", ProductDetailByCategory.as_view()),
+
+    path("home/", HomeView.as_view()),
+    path("banners/", BannerView.as_view()),
+    path("carousel/", CarouselView.as_view()),
 ]
+
