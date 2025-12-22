@@ -1,52 +1,109 @@
-from django.shortcuts import render
-# payments/views.py
+import json
+import hmac
+import hashlib
+import razorpay
+
+from django.conf import settings
+from django.http import HttpResponse
+from django.db import transaction
+
+from django.views.decorators.csrf import csrf_exempt
+
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.conf import settings
-import razorpay
+from rest_framework import status
 
 from orders.models import Order
+from products.models import Product
+from users.models import Address
 from .models import Payment
 
 
-# Create your views here.
-# ======================================================================
-# 💳 RAZORPAY
-# ======================================================================
+# ======================================================
+# 💳 CREATE RAZORPAY ORDER (RETRY SAFE)
+# ======================================================
 class CreateRazorpayOrder(APIView):
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request):
-        order_id = request.data.get("order_id")
+        product_id = request.data.get("product_id")
+        size = request.data.get("size")
+        quantity = int(request.data.get("quantity", 1))
+        address_id = request.data.get("address_id")
 
+        if not product_id or not size or not address_id:
+            return Response(
+                {"error": "product_id, size, address_id required"},
+                status=400
+            )
+
+        # 🔹 Validate product & address
         try:
-            order = Order.objects.get(id=order_id, user=request.user)
-        except Order.DoesNotExist:
-            return Response({"error": "Order not found"}, status=404)
+            product = Product.objects.get(id=product_id)
+            address = Address.objects.get(id=address_id, user=request.user)
+        except (Product.DoesNotExist, Address.DoesNotExist):
+            return Response(
+                {"error": "Invalid product or address"},
+                status=404
+            )
 
+        quantity = max(1, quantity)
+        total_amount = product.price * quantity
+
+        # 🔹 Create Order
+        order = Order.objects.create(
+            user=request.user,
+            address=address,
+            total_amount=total_amount
+        )
+
+        # 🔹 Create Order Item
+        OrderItem.objects.create(
+            order=order,
+            product=product,
+            size=size,
+            quantity=quantity,
+            price=product.price
+        )
+
+        # 🔹 Create Razorpay Order
         client = razorpay.Client(
-            auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+            auth=(
+                settings.RAZORPAY_KEY_ID,
+                settings.RAZORPAY_KEY_SECRET
+            )
         )
 
         razorpay_order = client.order.create({
-            "amount": int(order.total_amount * 100),
+            "amount": int(total_amount * 100),  # paise
             "currency": "INR",
             "payment_capture": 1
         })
 
+        # 🔹 Save Payment Entry
         Payment.objects.create(
             order=order,
-            razorpay_order_id=razorpay_order["id"]
+            razorpay_order_id=razorpay_order["id"],
+            status="CREATED"
         )
 
+        # 🔹 Return payment info to frontend
         return Response({
-            "key": settings.RAZORPAY_KEY_ID,
-            "order_id": razorpay_order["id"],
-            "amount": order.total_amount,
-            "currency": "INR"
-        }, status=200)
-    
+            "message": "Buy Now order created",
+            "order_id": order.id,
+            "razorpay": {
+                "key": settings.RAZORPAY_KEY_ID,
+                "razorpay_order_id": razorpay_order["id"],
+                "amount": total_amount,
+                "currency": "INR"
+            }
+        }, status=201)
+
+# ======================================================
+# ✅ VERIFY PAYMENT (FRONTEND CALLBACK)
+# ======================================================
 class VerifyRazorpayPayment(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -55,10 +112,14 @@ class VerifyRazorpayPayment(APIView):
         razorpay_payment_id = request.data.get("razorpay_payment_id")
         razorpay_signature = request.data.get("razorpay_signature")
 
-        if not razorpay_order_id or not razorpay_payment_id or not razorpay_signature:
+        if not all([
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature
+        ]):
             return Response(
                 {"error": "Missing payment details"},
-                status=400
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
@@ -68,11 +129,14 @@ class VerifyRazorpayPayment(APIView):
         except Payment.DoesNotExist:
             return Response(
                 {"error": "Payment record not found"},
-                status=404
+                status=status.HTTP_404_NOT_FOUND
             )
 
         client = razorpay.Client(
-            auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+            auth=(
+                settings.RAZORPAY_KEY_ID,
+                settings.RAZORPAY_KEY_SECRET
+            )
         )
 
         try:
@@ -83,22 +147,77 @@ class VerifyRazorpayPayment(APIView):
             })
         except razorpay.errors.SignatureVerificationError:
             return Response(
-                {"error": "Payment verification failed"},
-                status=400
+                {"error": "Invalid payment signature"},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        # ✅ Mark payment success
+        # ⚠️ Do NOT confirm order here
         payment.razorpay_payment_id = razorpay_payment_id
         payment.razorpay_signature = razorpay_signature
-        payment.is_paid = True
         payment.save()
 
-        # ✅ Update order status
-        order = payment.order
-        order.status = "Confirmed"
-        order.save()
-
         return Response(
-            {"message": "Payment verified successfully"},
-            status=200
+            {"message": "Payment verified. Awaiting confirmation."},
+            status=status.HTTP_200_OK
         )
+
+
+# ======================================================
+# 🔔 RAZORPAY WEBHOOK (FINAL AUTHORITY)
+# ======================================================
+@csrf_exempt
+def razorpay_webhook(request):
+    received_signature = request.headers.get("X-Razorpay-Signature")
+    payload = request.body
+
+    expected_signature = hmac.new(
+        settings.RAZORPAY_WEBHOOK_SECRET.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(
+        received_signature or "",
+        expected_signature
+    ):
+        return HttpResponse(status=400)
+
+    data = json.loads(payload)
+    event = data.get("event")
+
+    # ✅ PAYMENT SUCCESS
+    if event == "payment.captured":
+        entity = data["payload"]["payment"]["entity"]
+        razorpay_order_id = entity["order_id"]
+        razorpay_payment_id = entity["id"]
+
+        try:
+            payment = Payment.objects.get(
+                razorpay_order_id=razorpay_order_id
+            )
+            payment.razorpay_payment_id = razorpay_payment_id
+            payment.status = "PAID"
+            payment.save()
+
+            order = payment.order
+            order.status = "CONFIRMED"
+            order.save()
+
+        except Payment.DoesNotExist:
+            pass
+
+    # ❌ PAYMENT FAILED
+    elif event == "payment.failed":
+        entity = data["payload"]["payment"]["entity"]
+        razorpay_order_id = entity["order_id"]
+
+        try:
+            payment = Payment.objects.get(
+                razorpay_order_id=razorpay_order_id
+            )
+            payment.status = "FAILED"
+            payment.save()
+        except Payment.DoesNotExist:
+            pass
+
+    return HttpResponse(status=200)
