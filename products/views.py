@@ -207,3 +207,41 @@ class HomeView(APIView):
             },
             status=200
         )
+    
+class ProductDetailBySlug(APIView):
+    """
+    GET product details using slug
+    URL: /products/products/<slug>/
+    """
+
+    def get(self, request, slug):
+        try:
+            product = Product.objects.get(slug=slug)
+        except Product.DoesNotExist:
+            return Response(
+                {"error": "Product not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = ProductSerializer(product)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class ProductDetailByCategory(APIView):
+    """
+    GET products by category
+    URL: /products/products/category/<category>/
+    """
+
+    def get(self, request, category):
+        products = Product.objects.filter(
+            category__iexact=category
+        ).order_by("-id")
+
+        if not products.exists():
+            return Response(
+                {"message": "No products found for this category"},
+                status=status.HTTP_200_OK
+            )
+
+        serializer = ProductSerializer(products, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
