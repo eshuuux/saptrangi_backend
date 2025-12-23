@@ -8,5 +8,5 @@ from .views import (
 urlpatterns = [
     path("razorpay/create/", CreateRazorpayOrder.as_view()),
     path("razorpay/verify/", VerifyRazorpayPayment.as_view()),
-    path("payments/razorpay/webhook/", razorpay_webhook),
+    path("razorpay/webhook/", razorpay_webhook),
 ]
