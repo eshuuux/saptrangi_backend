@@ -1,3 +1,4 @@
+# payments/models.py
 from django.db import models
 from orders.models import Order
 
@@ -20,11 +21,13 @@ class Payment(models.Model):
         unique=True,
         db_index=True
     )
+
     razorpay_payment_id = models.CharField(
         max_length=200,
         blank=True,
         null=True
     )
+
     razorpay_signature = models.CharField(
         max_length=200,
         blank=True,

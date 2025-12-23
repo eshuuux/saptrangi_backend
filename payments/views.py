@@ -225,6 +225,7 @@
 
 
 # payments/views.py
+# payments/views.py
 import razorpay
 from django.conf import settings
 from django.db import transaction
@@ -238,6 +239,7 @@ from orders.models import Order, OrderItem
 from products.models import Product
 from users.models import Address
 from .models import Payment
+
 
 class CreateRazorpayOrder(APIView):
     permission_classes = [IsAuthenticated]
@@ -265,14 +267,14 @@ class CreateRazorpayOrder(APIView):
             )
 
         quantity = max(1, quantity)
-        total_amount_rupees = product.price * quantity
-        total_amount_paise = int(total_amount_rupees * 100)
+        total_rupees = product.price * quantity
+        total_paise = int(total_rupees * 100)
 
-        # 🔒 CREATE ORDER
+        # 🔹 Create Order
         order = Order.objects.create(
             user=request.user,
             address=address,
-            total_amount=total_amount_rupees
+            total_amount=total_rupees
         )
 
         OrderItem.objects.create(
@@ -283,7 +285,7 @@ class CreateRazorpayOrder(APIView):
             price=product.price
         )
 
-        # 🔁 RETRY SAFE
+        # 🔒 Prevent duplicate payment
         if hasattr(order, "payment"):
             return Response(
                 {"error": "Payment already initiated"},
@@ -295,27 +297,26 @@ class CreateRazorpayOrder(APIView):
         )
 
         razorpay_order = client.order.create({
-            "amount": total_amount_paise,
+            "amount": total_paise,
             "currency": "INR"
         })
 
         Payment.objects.create(
             order=order,
             razorpay_order_id=razorpay_order["id"],
-            amount=total_amount_paise,
             status="CREATED"
         )
 
         return Response({
-            "message": "Order created successfully",
             "order_id": order.id,
             "razorpay": {
                 "key": settings.RAZORPAY_KEY_ID,
                 "razorpay_order_id": razorpay_order["id"],
-                "amount": total_amount_paise,
+                "amount": total_paise,   # ⚠️ only sent to frontend
                 "currency": "INR"
             }
         }, status=201)
+
 
 class VerifyRazorpayPayment(APIView):
     permission_classes = [IsAuthenticated]
@@ -349,7 +350,7 @@ class VerifyRazorpayPayment(APIView):
             client.utility.verify_payment_signature({
                 "razorpay_order_id": razorpay_order_id,
                 "razorpay_payment_id": razorpay_payment_id,
-                "razorpay_signature": razorpay_signature
+                "razorpay_signature": razorpay_signature,
             })
         except razorpay.errors.SignatureVerificationError:
             return Response(
@@ -362,9 +363,11 @@ class VerifyRazorpayPayment(APIView):
         payment.save()
 
         return Response(
-            {"message": "Payment verified. Waiting for webhook confirmation."},
+            {"message": "Payment verified. Waiting for webhook."},
             status=status.HTTP_200_OK
         )
+
+
 import json
 import hmac
 import hashlib
@@ -374,60 +377,6 @@ from django.conf import settings
 
 from .models import Payment
 
-
-@csrf_exempt
-def razorpay_webhook(request):
-    received_signature = request.headers.get("X-Razorpay-Signature")
-    payload = request.body
-
-    expected_signature = hmac.new(
-        settings.RAZORPAY_WEBHOOK_SECRET.encode(),
-        payload,
-        hashlib.sha256
-    ).hexdigest()
-
-    if not hmac.compare_digest(received_signature or "", expected_signature):
-        return HttpResponse(status=400)
-
-    data = json.loads(payload)
-    event = data.get("event")
-
-    if event == "payment.captured":
-        entity = data["payload"]["payment"]["entity"]
-        razorpay_order_id = entity["order_id"]
-        razorpay_payment_id = entity["id"]
-
-        try:
-            payment = Payment.objects.get(
-                razorpay_order_id=razorpay_order_id
-            )
-
-            if payment.status != "PAID":
-                payment.status = "PAID"
-                payment.razorpay_payment_id = razorpay_payment_id
-                payment.save()
-
-                order = payment.order
-                order.status = "CONFIRMED"
-                order.save()
-
-        except Payment.DoesNotExist:
-            pass
-
-    elif event == "payment.failed":
-        entity = data["payload"]["payment"]["entity"]
-        razorpay_order_id = entity["order_id"]
-
-        try:
-            payment = Payment.objects.get(
-                razorpay_order_id=razorpay_order_id
-            )
-            payment.status = "FAILED"
-            payment.save()
-        except Payment.DoesNotExist:
-            pass
-
-    return HttpResponse(status=200)
 
 @csrf_exempt
 def razorpay_webhook(request):
