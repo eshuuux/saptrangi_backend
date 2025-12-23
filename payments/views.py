@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from orders.models import Order
+from orders.models import OrderItem
 from products.models import Product
 from users.models import Address
 from .models import Payment
