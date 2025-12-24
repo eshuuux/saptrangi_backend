@@ -123,9 +123,9 @@ SIMPLE_JWT = {
 
 DATABASES = {
     "default": dj_database_url.config(
-        env="DATABASE_URL",
-        default="postgresql://tushar:FIA4Ku7ZeeYXSbyq4enjM0LTZ9ur6hLK@dpg-d562i28gjchc738pmb10-a.oregon-postgres.render.com/saajnika",
+        default=os.environ.get("DATABASE_URL"),
         conn_max_age=600,
+        ssl_require=True
     )
 }
 
