@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Carousel, Product, Banner
+from .models import Carousel, Product, ProductImage, Banner
 
 
 # =============================================================
@@ -16,6 +16,11 @@ class CarouselSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class ProductImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductImage
+        fields = ["id", "image_url"]
+
 
 # =============================================================
 # PRODUCT SERIALIZER (Main Product API Handling)
@@ -29,7 +34,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     # Auto-calculated price after discount (Optional UI improvement)
     discounted_price = serializers.SerializerMethodField(read_only=True)
-
+    images = ProductImageSerializer(many=True, read_only=True)
     class Meta:
         model = Product
         fields = "__all__"

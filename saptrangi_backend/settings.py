@@ -77,7 +77,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "https://saptrangi.netlify.app",
-    
+
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -124,7 +124,7 @@ SIMPLE_JWT = {
 DATABASES = {
     "default": dj_database_url.config(
         env="DATABASE_URL",
-        default="postgresql://ashish:k0vJbZcMjphSS9140WT38mH9jvdeXlNV@dpg-d4i6f195pdvs739knlbg-a.oregon-postgres.render.com/saptrangi",
+        default="postgresql://tushar:FIA4Ku7ZeeYXSbyq4enjM0LTZ9ur6hLK@dpg-d562i28gjchc738pmb10-a.oregon-postgres.render.com/saajnika",
         conn_max_age=600,
     )
 }

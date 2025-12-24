@@ -7,7 +7,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 import cloudinary.uploader
 
-from .models import Carousel, Product, Banner
+from .models import Carousel, Product, Banner, ProductImage
 from .serializers import CarouselSerializer, BannerSerializer, ProductSerializer
 
 
@@ -84,6 +84,7 @@ class ProductView(APIView):
             data["main_image"] = upload_to_cloudinary(
                 request.FILES["main_image"], "products/main/"
             )
+
         if "hover_image" in request.FILES:
             data["hover_image"] = upload_to_cloudinary(
                 request.FILES["hover_image"], "products/hover/"
@@ -91,8 +92,19 @@ class ProductView(APIView):
 
         serializer = ProductSerializer(data=data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=201)
+            product = serializer.save()
+
+            # 🔹 Handle multiple gallery images
+            gallery_images = request.FILES.getlist("gallery_images")
+            for img in gallery_images:
+                url = upload_to_cloudinary(img, "products/gallery/")
+                ProductImage.objects.create(
+                    product=product,
+                    image_url=url
+                )
+
+            return Response(ProductSerializer(product).data, status=201)
+
         return Response(serializer.errors, status=400)
 
     def put(self, request):

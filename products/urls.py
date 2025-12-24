@@ -11,5 +11,3 @@ urlpatterns = [
     path("details/<slug:slug>/", ProductDetailBySlug.as_view()),
     path("admin/", ProductView.as_view()),
 ]
-
-

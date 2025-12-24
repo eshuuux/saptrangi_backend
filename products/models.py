@@ -25,7 +25,6 @@ class Product(models.Model):
 
     main_image = models.URLField(blank=True)
     hover_image = models.URLField(blank=True)
-
     category = models.CharField(max_length=100, db_index=True)
     fabric = models.CharField(max_length=100, blank=True)
     size = models.CharField(max_length=100, blank=True)
@@ -52,6 +51,22 @@ class Product(models.Model):
             base_slug = slugify(self.name)
             self.slug = f"{base_slug}-{uuid.uuid4().hex[:6]}"
         super().save(*args, **kwargs)
+
+class ProductImage(models.Model):
+    product = models.ForeignKey(
+        Product,
+        related_name="images",
+        on_delete=models.CASCADE
+    )
+    image_url = models.URLField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "product_images"
+
+    def __str__(self):
+        return f"Image for {self.product.name}"
+
 
 
 class Banner(models.Model):
