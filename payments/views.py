@@ -311,43 +311,44 @@ class CreateRazorpayOrder(APIView):
 # ======================================================
 # ✅ VERIFY PAYMENT (REDIRECT CALLBACK)
 # ======================================================
-class VerifyRazorpayPayment(APIView):
-    permission_classes = [AllowAny]  # Razorpay is unauthenticated
+# 
+@csrf_exempt
+def razorpay_callback(request):
+    if request.method != "POST":
+        return HttpResponse(status=400)
 
-    def get(self, request):
-        razorpay_order_id = request.GET.get("razorpay_order_id")
-        razorpay_payment_id = request.GET.get("razorpay_payment_id")
-        razorpay_signature = request.GET.get("razorpay_signature")
+    razorpay_order_id = request.POST.get("razorpay_order_id")
+    razorpay_payment_id = request.POST.get("razorpay_payment_id")
+    razorpay_signature = request.POST.get("razorpay_signature")
 
-        if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
-            return redirect("https://saptrangi.netlify.app/payment-failed")
+    if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
+        return redirect("https://saptrangi.netlify.app/payment-failed")
 
-        try:
-            payment = Payment.objects.get(
-                razorpay_order_id=razorpay_order_id
-            )
-        except Payment.DoesNotExist:
-            return redirect("https://saptrangi.netlify.app/payment-failed")
+    # 🔐 Verify signature
+    generated_signature = hmac.new(
+        settings.RAZORPAY_KEY_SECRET.encode(),
+        f"{razorpay_order_id}|{razorpay_payment_id}".encode(),
+        hashlib.sha256
+    ).hexdigest()
 
-        client = razorpay.Client(
-            auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
-        )
+    if generated_signature != razorpay_signature:
+        return redirect("https://saptrangi.netlify.app/payment-failed")
 
-        try:
-            client.utility.verify_payment_signature({
-                "razorpay_order_id": razorpay_order_id,
-                "razorpay_payment_id": razorpay_payment_id,
-                "razorpay_signature": razorpay_signature,
-            })
-        except razorpay.errors.SignatureVerificationError:
-            return redirect("https://saptrangi.netlify.app/payment-failed")
+    # ✅ Payment verified (DO NOT WAIT FOR FRONTEND)
+    try:
+        payment = Payment.objects.get(razorpay_order_id=razorpay_order_id)
+        payment.status = "PAID"
+        payment.razorpay_payment_id = razorpay_payment_id
+        payment.save()
 
-        # ❗ Do NOT update DB here
-        # Webhook will mark payment as PAID
+        order = payment.order
+        order.status = "CONFIRMED"
+        order.save()
+    except Payment.DoesNotExist:
+        pass
 
-        return redirect("https://saptrangi.netlify.app/order-success")
-
-
+    # 🔥 MOST IMPORTANT
+    return redirect("https://saptrangi.netlify.app/order-success")
 # ======================================================
 # 🔔 RAZORPAY WEBHOOK (FINAL AUTHORITY)
 # ======================================================
