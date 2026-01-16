@@ -21,7 +21,7 @@ class Product(models.Model):
     mrp = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
     discount = models.PositiveIntegerField(default=0)
-    rating = models.FloatField(default=0)
+    rating = models.FloatField(default=0, editable=False)
 
     main_image = models.URLField(blank=True)
     hover_image = models.URLField(blank=True)

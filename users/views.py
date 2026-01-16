@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
-from .models import OTP, Address, User
+from .models import OTP, Address, User, Admin
 from .serializers import UserSerializer, AddressSerializer
 # =============================================================
 # USER PROFILE (JWT Protected)
@@ -278,3 +278,37 @@ class AddressView(APIView):
                 {"error": "Address not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+class AdminLoginView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        password = request.data.get("password")
+
+        # -------- VALIDATION --------
+        if not email or not password:
+            return Response(
+                {"error": "Email and password are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # -------- CHECK ADMIN --------
+        try:
+            admin = Admin.objects.get(email=email, password=password)
+        except Admin.DoesNotExist:
+            return Response(
+                {"error": "Invalid email or password"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # -------- SUCCESS --------
+        return Response(
+            {
+                "message": "Admin login successful",
+                "admin": {
+                    "id": admin.id,
+                    "email": admin.email
+                }
+            },
+            status=status.HTTP_200_OK
+        )

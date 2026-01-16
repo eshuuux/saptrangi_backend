@@ -5,7 +5,8 @@ from .views import (
     ProfileView,
     UpdateProfile,
     AddressView,
-    RefreshTokenView
+    RefreshTokenView,
+    AdminLoginView
 )
 
 urlpatterns = [
@@ -20,4 +21,6 @@ urlpatterns = [
 
     # ADDRESS
     path("addresses/", AddressView.as_view()),
+
+    path("admin/login/", AdminLoginView.as_view()),
 ]

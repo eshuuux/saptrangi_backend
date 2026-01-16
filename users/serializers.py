@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import User, Address
+from .models import Admin
 
 class UserSerializer(serializers.ModelSerializer):
     """
@@ -31,3 +32,7 @@ class AddressSerializer(serializers.ModelSerializer):
         model = Address
         exclude = ["user"]   # user comes from request
 
+class AdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Admin
+        exclude = ("password",)

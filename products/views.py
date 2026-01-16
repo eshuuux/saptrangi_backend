@@ -104,7 +104,6 @@ class ProductView(APIView):
                 )
 
             return Response(ProductSerializer(product).data, status=201)
-
         return Response(serializer.errors, status=400)
 
     def put(self, request):

@@ -398,3 +398,19 @@ def razorpay_webhook(request):
         payment.save()
 
     return HttpResponse(status=200)
+
+class OrderStatusAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id, user=request.user)
+            return Response({
+                "order_id": order.id,
+                "status": order.status
+            })
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
